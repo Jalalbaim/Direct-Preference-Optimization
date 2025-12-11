@@ -11,6 +11,12 @@ sys.path.append(ROOT)
 from src.dpo.models import load_models, compute_logprobs
 from src.dpo.utils import load_yaml_config
 
+from datasets import load_dataset
+
+#LOAD DATA -----------------
+ds = load_dataset("openai/summarize_from_feedback", "comparisons")
+
+
 #MAIN FUNCTIONS -----------------
 def load_summary_classifier(model_name: str, device: str):
     clf_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -21,6 +27,14 @@ def load_summary_classifier(model_name: str, device: str):
     clf_model.to(device)
     clf_model.eval()
     return clf_tokenizer, clf_model
+
+
+def format_dpo(ds):
+    return ds.map(lambda x: {
+        "prompt": x["info"]["post"],
+        "chosen": x["summaries"]["chosen"],
+        "rejected": x["summaries"]["rejected"],
+    })
 
 
 @torch.no_grad()

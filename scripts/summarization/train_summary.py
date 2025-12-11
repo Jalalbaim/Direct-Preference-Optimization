@@ -17,7 +17,7 @@ from src.dpo.utils import load_yaml_config
 
 #MAIN FUNCTIONS -----------------
 def main():
-    config_path = "configs/sentiment.yaml"
+    config_path = "configs/summary.yaml"
     config = load_yaml_config(config_path)
 
     model_name = config["model"]["name"]
@@ -26,3 +26,5 @@ def main():
     # modèles + tokenizer
     mb = load_models(model_name, dtype=dtype)
     tokenizer = mb.tokenizer
+
+    
