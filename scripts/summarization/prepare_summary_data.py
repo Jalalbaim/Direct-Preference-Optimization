@@ -16,7 +16,6 @@ from datasets import load_dataset
 #LOAD DATA -----------------
 ds = load_dataset("openai/summarize_from_feedback", "comparisons")
 
-
 #MAIN FUNCTIONS -----------------
 def load_summary_classifier(model_name: str, device: str):
     clf_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -56,6 +55,7 @@ def summary_score(texts, clf_tokenizer, clf_model, device: str):
     #Transformer en proba avec le softmax
     log_probs = torch.log_softmax(logits, dim=-1)
     last_token_log_probs = log_probs[:, -1, :]
-    scores = torch.max(last_token_log_probs, dim=-1).values  # Example: max log-prob of last token
+    scores = torch.max(last_token_log_probs, dim=-1).values  
+
     return scores.cpu()
 
