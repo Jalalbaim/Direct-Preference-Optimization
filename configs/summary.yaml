@@ -1,0 +1,31 @@
+experiment_name: "dpo_summary"
+
+model:
+  name: "CarperAI/openai_summarize_tldr_sft" #As mentioned in page 7 of the paper
+  dtype: "bfloat16" #"float16" or "float32"
+  use_flash_attention: false
+
+training:
+  seed: 42
+  num_epochs: 1
+  batch_size: 1
+  grad_accumulation_steps: 16
+  learning_rate: 1e-5
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  warmup_steps: 100
+
+dpo:
+  beta: 0.1 # hyperparam DPO
+  label_smoothing: 0.0
+
+data:
+  train_path: "data/processed/summary/train_preferences.jsonl"
+  val_path: "data/processed/summary/val_preferences.jsonl"
+  max_prompt_length: 256
+  max_response_length: 128
+
+logging:
+  save_dir: "checkpoints/summary_dpo"
+  log_every: 50
+  eval_every: 500

@@ -25,7 +25,7 @@ def load_summary_classifier(model_name: str, device: str):
 
 @torch.no_grad()
 def summary_score(texts, clf_tokenizer, clf_model, device: str):
-    
+
     text_final = texts.prompt + "\n\nSummary:" + texts.answer
 
     enc = clf_tokenizer(
@@ -35,6 +35,7 @@ def summary_score(texts, clf_tokenizer, clf_model, device: str):
         max_length=512,
         return_tensors="pt",
     ).to(device)
+
     outputs = clf_model(**enc)
     logits = outputs.logits
 
@@ -43,3 +44,4 @@ def summary_score(texts, clf_tokenizer, clf_model, device: str):
     last_token_log_probs = log_probs[:, -1, :]
     scores = torch.max(last_token_log_probs, dim=-1).values  # Example: max log-prob of last token
     return scores.cpu()
+
