@@ -30,7 +30,6 @@ def main():
     config_path = "configs/summary.yaml"
     config = load_yaml_config(config_path)
 
-
     #LOAD DATASET WITH HUMAN PREFERENCES -----------------
     ds = load_dataset("openai/summarize_from_feedback", "comparisons")
 
