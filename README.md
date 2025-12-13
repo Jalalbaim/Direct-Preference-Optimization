@@ -23,6 +23,8 @@ The project implements DPO training on a sentiment classification task with:
 pip install -r requirements.txt
 ```
 
+### Sentiment generation
+
 ```bash
 # Prepare data
 python scripts/prepare_sentiment_data.py
@@ -33,4 +35,12 @@ python3 scripts/train_sentiment.py
 
 # Evaluate
 python scripts/eval_sentiment.py
+```
+
+### Summarization
+```bash
+# Prepare data
+python3 scripts/summarization/prepare_summary_data.py
+
+
 ```
