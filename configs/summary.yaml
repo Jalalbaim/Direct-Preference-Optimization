@@ -22,8 +22,7 @@ dpo:
 data:
   train_path: "data/processed/summary/train_preferences.jsonl"
   val_path: "data/processed/summary/val_preferences.jsonl"
-  max_prompt_length: 256
-  max_response_length: 128
+  prompt_nb: 200
 
 logging:
   save_dir: "checkpoints/summary_dpo"
