@@ -23,7 +23,7 @@ def main():
     model_name = config["model"]["name"]
     dtype = config["model"]["dtype"]
 
-    # modèles + tokenizer
+    print(f"Model name: {model_name}")
     mb = load_models(model_name, dtype=dtype)
     tokenizer = mb.tokenizer
 

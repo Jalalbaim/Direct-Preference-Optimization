@@ -42,5 +42,6 @@ python scripts/eval_sentiment.py
 # Prepare data
 python3 scripts/summarization/prepare_summary_data.py
 
-
+#Train model
+python3 scripts/summarization/train_summary.py 
 ```

@@ -2,7 +2,7 @@ experiment_name: "dpo_summary"
 
 model:
   name: "CarperAI/openai_summarize_tldr_sft" #As mentioned in page 7 of the paper
-  dtype: "bfloat16" #"float16" or "float32"
+  dtype: "float32" 
   use_flash_attention: false
 
 training:
