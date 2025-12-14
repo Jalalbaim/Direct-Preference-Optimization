@@ -8,6 +8,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import os
 import sys
 from datasets import load_dataset
+import random
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
@@ -29,16 +30,24 @@ def format_dpo(dataset):
 def main():
     config_path = "configs/summary.yaml"
     config = load_yaml_config(config_path)
+    seed = random.Random(config["training"]["seed"])
 
     #LOAD DATASET WITH HUMAN PREFERENCES -----------------
     ds = load_dataset("openai/summarize_from_feedback", "comparisons")
 
     #FORMAT DATASET -----------------
-    ds = format_dpo(ds["train"].select(range(config["data"]["prompt_nb"])))
+    prompt_nb = config["data"]["prompt_nb"]
+
+    #train_indices = seed.sample(range(len(ds["train"])), prompt_nb)
+    #val_indices = seed.sample(range(len(ds["validation"])), prompt_nb)
+
+    ds_train = format_dpo(ds["train"].select(range(prompt_nb)))
+    ds_val = format_dpo(ds["validation"].select(range(prompt_nb)))
 
     #SAVE DATASET -----------------
     os.makedirs("data/processed/summarization", exist_ok=True)
-    ds.to_json("data/processed/summarization/summarization_dpo_data.jsonl")
+    ds_train.to_json("data/processed/summarization/train_summarization.jsonl")
+    ds_val.to_json("data/processed/summarization/val_summarization.jsonl")
 
 if __name__ == "__main__":
     main()
