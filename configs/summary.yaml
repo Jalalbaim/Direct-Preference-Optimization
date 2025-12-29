@@ -20,8 +20,8 @@ dpo:
   label_smoothing: 0.0
 
 data:
-  train_path: "data/processed/summary/train_preferences.jsonl"
-  val_path: "data/processed/summary/val_preferences.jsonl"
+  train_path: "data/processed/summarization/train_summarization.jsonl"
+  val_path: "data/processed/summarization/val_summarization.jsonl"
   prompt_nb: 200
   max_prompt_length: 512
   max_response_length: 256
