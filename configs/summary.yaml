@@ -22,7 +22,7 @@ dpo:
 data:
   train_path: "data/processed/summarization/train_summarization.jsonl"
   val_path: "data/processed/summarization/val_summarization.jsonl"
-  prompt_nb: 200
+  prompt_nb: 500
   max_prompt_length: 512
   max_response_length: 256
 
