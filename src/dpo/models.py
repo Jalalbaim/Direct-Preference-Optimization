@@ -41,6 +41,7 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
         model_name,
         torch_dtype=torch_dtype,
         device_map="auto",
+        offload_folder="offload"
     )
     
     # Activer gradient checkpointing pour économiser la mémoire
