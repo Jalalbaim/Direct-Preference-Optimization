@@ -54,6 +54,8 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
         model_name,
         torch_dtype=torch_dtype,
         device_map="auto",
+        load_in_8bit=True,
+        offload_folder="offload"
     )
     ref_model.eval()
     for p in ref_model.parameters():
