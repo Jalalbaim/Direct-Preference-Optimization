@@ -44,6 +44,7 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
         load_in_8bit=True,
         offload_folder="offload"
     )
+    policy_model.gradient_checkpointing_enable()
     
     # Activer gradient checkpointing pour économiser la mémoire
     if hasattr(policy_model, 'gradient_checkpointing_enable'):
