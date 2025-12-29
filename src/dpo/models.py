@@ -14,7 +14,12 @@ class ModelBundle:
 
 
 def load_tokenizer(model_name: str) -> AutoTokenizer:
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+    except Exception:
+        tokenizer = AutoTokenizer.from_pretrained("gpt2") #Se base sur le config.json du modèle utilisé pour summarization
+
+    print("DEBUG PRINT")
     # Gemma est en causal LM, on s'assure d'avoir un pad token
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
