@@ -70,11 +70,10 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
     # Référence = copie gelée du policy initial
     ref_model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch_dtype,
-        device_map="auto",
-        quantization_config=quant_config,
-        offload_folder="offload_ref"
+        torch_dtype=torch.float16,
+        device_map="cpu"
     )
+
     ref_model.eval()
     for p in ref_model.parameters():
         p.requires_grad = False
