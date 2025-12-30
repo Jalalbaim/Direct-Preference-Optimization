@@ -3,6 +3,8 @@ from typing import Tuple
 
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import BitsAndBytesConfig
+
 
 
 @dataclass
@@ -35,13 +37,18 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
         "bfloat16": torch.bfloat16,
     }.get(dtype, torch.bfloat16)
 
+    quant_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        llm_int8_enable_fp32_cpu_offload=True
+    )
+
     tokenizer = load_tokenizer(model_name)
 
     policy_model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch_dtype,
         device_map="auto",
-        load_in_8bit=True,
+        quantization_config=quant_config,
         offload_folder="offload"
     )
     policy_model.gradient_checkpointing_enable()
@@ -55,7 +62,7 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
         model_name,
         torch_dtype=torch_dtype,
         device_map="auto",
-        load_in_8bit=True,
+        quantization_config=quant_config,
         offload_folder="offload"
     )
     ref_model.eval()
