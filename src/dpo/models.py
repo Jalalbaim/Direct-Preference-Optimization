@@ -21,7 +21,7 @@ def load_tokenizer(model_name: str) -> AutoTokenizer:
     except Exception:
         tokenizer = AutoTokenizer.from_pretrained("gpt2") #Se base sur le config.json du modèle utilisé pour summarization
 
-    print("DEBUG PRINT")
+    #print("DEBUG PRINT")
     # Gemma est en causal LM, on s'assure d'avoir un pad token
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -71,9 +71,9 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
     ref_model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch_dtype,
-        device_map="cpu",
+        device_map="auto",
         quantization_config=quant_config,
-        offload_folder="offload"
+        offload_folder="offload_ref"
     )
     ref_model.eval()
     for p in ref_model.parameters():
