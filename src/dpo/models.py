@@ -37,9 +37,16 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
         "bfloat16": torch.bfloat16,
     }.get(dtype, torch.bfloat16)
 
+    #quant_config = BitsAndBytesConfig(
+    #    load_in_8bit=True,
+    #    llm_int8_enable_fp32_cpu_offload=True
+    #)
+
     quant_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-        llm_int8_enable_fp32_cpu_offload=True
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=torch.bfloat16  
     )
 
     tokenizer = load_tokenizer(model_name)
