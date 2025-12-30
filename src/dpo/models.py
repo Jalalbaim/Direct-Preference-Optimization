@@ -31,6 +31,8 @@ def load_tokenizer(model_name: str) -> AutoTokenizer:
 def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    torch.cuda.empty_cache()
+
     torch_dtype = {
         "float32": torch.float32,
         "float16": torch.float16,
@@ -63,12 +65,13 @@ def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
     # Activer gradient checkpointing pour économiser la mémoire
     if hasattr(policy_model, 'gradient_checkpointing_enable'):
         policy_model.gradient_checkpointing_enable()
+        policy_model.config.use_cache = False
 
     # Référence = copie gelée du policy initial
     ref_model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch_dtype,
-        device_map="auto",
+        device_map="cpu",
         quantization_config=quant_config,
         offload_folder="offload"
     )
