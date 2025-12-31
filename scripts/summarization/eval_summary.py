@@ -8,6 +8,8 @@ import torch
 from datasets import load_dataset
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import BitsAndBytesConfig
+from accelerate.utils import set_module_tensor_to_device
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
@@ -59,7 +61,7 @@ def generate_win_rate(
     for summary_a, summary_b, original in zip(summaries_a, summaries_b, original_texts):
         #Prompting GPT-4
         response = openai.ChatCompletion.create(
-            model="gtp-5-0314",
+            model="gpt-5-0314",
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
             max_tokens=500
@@ -132,9 +134,16 @@ def main():
 
     # checkpoint DPO
     if args.dpo_checkpoint and os.path.exists(args.dpo_checkpoint):
-        ckpt = torch.load(args.dpo_checkpoint, map_location=device)
-        policy_model.load_state_dict(ckpt["model_state_dict"])
-        print(f"Loaded DPO checkpoint: {args.dpo_checkpoint}")
+        ckpt = torch.load(args.dpo_checkpoint, map_location="cpu")
+        state_dict = ckpt["model_state_dict"]
+        
+        for name, tensor in state_dict.items():
+            try:
+                set_module_tensor_to_device(policy_model, name, device=0, value=tensor)
+            except Exception as e:
+                print(f"Skipping key {name} due to: {e}")
+                
+        print(f"Successfully loaded DPO checkpoint: {args.dpo_checkpoint}")
     else:
         print("WARNING: DPO checkpoint not found, using base model as policy.")
 
@@ -200,7 +209,7 @@ def main():
 
     import numpy as np
     win_rate_a, win_rate_b = generate_win_rate(
-        summaries_a, summaries_b, original, prompt=config["dpo"]["prompt"], temperature=0.7, model="gpt-4-turbo"
+        summaries_a, summaries_b, original, prompt=config["dpo"]["prompt"], temperature=0.7
     )
 
     #avg_r_ref = float(np.mean(rewards_ref))
