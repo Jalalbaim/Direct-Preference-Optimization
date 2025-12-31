@@ -27,6 +27,7 @@ class DPOTrainer:
         self.device = self.mb.device
         self.policy_model = self.mb.policy_model
         self.ref_model = self.mb.ref_model
+        self.ref_model.eval()
         self.beta = float(config["dpo"]["beta"])
 
         self.optimizer = AdamW(
@@ -81,18 +82,19 @@ class DPOTrainer:
         batch = {k: v.to(self.device) for k, v in batch.items()}
 
         # log-probs policy
-        policy_chosen_logps = compute_logprobs(
-            self.policy_model,
-            batch["chosen_input_ids"],
-            batch["chosen_attention_mask"],
-            batch["chosen_response_mask"],
-        )
-        policy_rejected_logps = compute_logprobs(
-            self.policy_model,
-            batch["rejected_input_ids"],
-            batch["rejected_attention_mask"],
-            batch["rejected_response_mask"],
-        )
+        with autocast():
+            policy_chosen_logps = compute_logprobs(
+                self.policy_model,
+                batch["chosen_input_ids"],
+                batch["chosen_attention_mask"],
+                batch["chosen_response_mask"],
+            )
+            policy_rejected_logps = compute_logprobs(
+                self.policy_model,
+                batch["rejected_input_ids"],
+                batch["rejected_attention_mask"],
+                batch["rejected_response_mask"],
+            )
 
         # log-probs ref
         with torch.no_grad():
@@ -121,6 +123,6 @@ class DPOTrainer:
         loss.backward()
         
         # Libérer le cache CUDA pour économiser de la mémoire
-        torch.cuda.empty_cache()
+        #torch.cuda.empty_cache()
 
         return loss
