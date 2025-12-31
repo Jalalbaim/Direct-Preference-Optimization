@@ -44,9 +44,9 @@ def generate_summary(model, tokenizer, prompt, max_new_tokens=64, temperature=0.
     return response, full_ids
 
 def generate_win_rate(
-    summaries_a: List[str],
-    summaries_b: List[str],
-    original_texts: List[str],
+    summaries_a: list[str],
+    summaries_b: list[str],
+    original_texts: list[str],
     prompt: str,
     temperature:float):
     """
