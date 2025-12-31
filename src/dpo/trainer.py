@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from tqdm.auto import tqdm
+from torch.cuda.amp import autocast
 
 from .losses import dpo_loss
 from .models import compute_logprobs, ModelBundle
