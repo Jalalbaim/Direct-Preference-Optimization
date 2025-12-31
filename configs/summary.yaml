@@ -44,5 +44,5 @@ data:
 
 logging:
   save_dir: "checkpoints/summary_dpo"
-  log_every: 10
+  log_every: 15
   eval_every: 50

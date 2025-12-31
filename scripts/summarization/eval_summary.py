@@ -9,7 +9,7 @@ from datasets import load_dataset
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
 
 from src.dpo.models import load_models, compute_logprobs
