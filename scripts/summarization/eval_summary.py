@@ -67,7 +67,7 @@ def generate_win_rate(
                                            .replace("<Summary B>", sb)
 
         response = client.chat.completions.create(
-            model="gpt-4-turbo", 
+            model="gpt-4.1-mini", 
             messages=[{"role": "user", "content": formatted_prompt}],
             temperature=temperature,
             max_tokens=200
