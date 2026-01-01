@@ -169,7 +169,7 @@ def main():
     print(f"Evaluating on {n} summary test examples")
 
     for i in tqdm(range(n)):
-        text = test_ds[i]["text"]
+        text = test_ds[i]["prompt"]
         prompt = text[: args.max_prompt_chars].strip()
         if not prompt:
             continue
