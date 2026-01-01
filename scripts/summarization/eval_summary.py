@@ -178,6 +178,7 @@ def main():
         api_key = userdata.get('OPENAI_API_KEY')
         client = OpenAI(api_key=api_key)
     except Exception as e:
+        print(f"Erreur réelle : {e}")
         print("Error: Could not find OPENAI_API_KEY in Colab Secrets.")
         return
 
