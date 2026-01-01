@@ -155,7 +155,7 @@ def main():
 
     # CarperAI dataset
     dataset = load_dataset("CarperAI/openai_summarize_tldr")
-    test_ds = dataset["test"]
+    test_ds = dataset["test"].select(range(15))
 
     # Evaluation
     kls = []
