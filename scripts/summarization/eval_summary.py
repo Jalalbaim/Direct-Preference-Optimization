@@ -232,7 +232,7 @@ def main():
 
     import numpy as np
     win_rate_a, win_rate_b = generate_win_rate(
-        client, summaries_a, summaries_b, original, prompt=config["dpo"]["prompt"], temperature=0.7
+        client, summaries_a, summaries_b, original, prompt_template=config["dpo"]["prompt"], temperature=0.7
     )
 
     #avg_r_ref = float(np.mean(rewards_ref))
