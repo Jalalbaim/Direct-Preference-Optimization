@@ -1,5 +1,5 @@
 #IMPORT LIBRARIES -----------------
-import openai 
+
 import os
 import sys
 import argparse
@@ -13,6 +13,10 @@ from accelerate.utils import set_module_tensor_to_device
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
+
+from openai import OpenAI
+
+client = OpenAI()
 
 from src.dpo.models import load_models, compute_logprobs
 from src.dpo.utils import load_yaml_config
@@ -60,8 +64,8 @@ def generate_win_rate(
 
     for summary_a, summary_b, original in zip(summaries_a, summaries_b, original_texts):
         #Prompting GPT-4
-        response = openai.ChatCompletion.create(
-            model="gpt-5-0314",
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",  # Updated from gtp-5-0314
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
             max_tokens=500
