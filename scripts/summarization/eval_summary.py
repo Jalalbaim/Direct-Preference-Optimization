@@ -13,6 +13,7 @@ from accelerate.utils import set_module_tensor_to_device
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
+api_key = os.getenv("OPENAI_API_KEY")
 
 from openai import OpenAI
 from google.colab import userdata #For Colab 
@@ -175,7 +176,7 @@ def main():
 
     # OPEN AI KEY
     try:
-        api_key = userdata.get('OPENAI_API_KEY')
+        #api_key = userdata.get('OPENAI_API_KEY')
         client = OpenAI(api_key=api_key)
     except Exception as e:
         print(f"Erreur réelle : {e}")
