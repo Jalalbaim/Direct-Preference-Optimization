@@ -15,8 +15,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.append(ROOT)
 
 from openai import OpenAI
+from google.colab import userdata #For Colab 
 
-client = OpenAI()
 
 from src.dpo.models import load_models, compute_logprobs
 from src.dpo.utils import load_yaml_config
@@ -50,36 +50,45 @@ def generate_summary(model, tokenizer, prompt, max_new_tokens=64, temperature=0.
     return response, full_ids
 
 def generate_win_rate(
+    client,
     summaries_a: list[str],
     summaries_b: list[str],
     original_texts: list[str],
-    prompt: str,
-    temperature:float):
-    """
-    This function computes the win rate of the chosen summaries over the rejected ones using GPT-4
-    """
+    prompt_template: str, 
+    temperature: float):
 
     win_rate_a = []
     win_rate_b = []
 
-    for summary_a, summary_b, original in zip(summaries_a, summaries_b, original_texts):
-        #Prompting GPT-4
+    for sa, sb, txt in tqdm(zip(summaries_a, summaries_b, original_texts), total=len(summaries_a)):
+        formatted_prompt = prompt_template.replace("<post>", txt)\
+                                           .replace("<Summary A>", sa)\
+                                           .replace("<Summary B>", sb)
+
         response = client.chat.completions.create(
-            model="gpt-4-turbo",  # Updated from gtp-5-0314
-            messages=[{"role": "user", "content": prompt}],
+            model="gpt-4-turbo", 
+            messages=[{"role": "user", "content": formatted_prompt}],
             temperature=temperature,
-            max_tokens=500
+            max_tokens=200
         )
 
-        choice = response.choices[0].message.content.strip().split("\n")[-1].strip() #based on https://platform.openai.com/docs/api-reference/chat/get
+        content = response.choices[0].message.content.strip()
+        
+        lines = content.split("\n")
+        choice = "None"
+        for line in lines:
+            if "Preferred:" in line:
+                choice = line.replace("Preferred:", "").strip().upper()
+                break
 
-        if choice == "A":
+        if "A" in choice:
             win_rate_a.append(1)
             win_rate_b.append(0)
-        elif choice == "B":
+        elif "B" in choice:
             win_rate_a.append(0)
             win_rate_b.append(1)
-        else: #No one wins or the answer is not valid
+        else:
+            print(f"Warning: GPT-4 gave an unclear answer: {content}")
             win_rate_a.append(0)
             win_rate_b.append(0)
 
@@ -164,6 +173,14 @@ def main():
     # Evaluation
     kls = []
 
+    # OPEN AI KEY
+    try:
+        api_key = userdata.get('OPENAI_API_KEY')
+        client = OpenAI(api_key=api_key)
+    except Exception as e:
+        print("Error: Could not find OPENAI_API_KEY in Colab Secrets.")
+        return
+
     # Summary data
     summaries_a = []
     summaries_b = []
@@ -213,7 +230,7 @@ def main():
 
     import numpy as np
     win_rate_a, win_rate_b = generate_win_rate(
-        summaries_a, summaries_b, original, prompt=config["dpo"]["prompt"], temperature=0.7
+        client, summaries_a, summaries_b, original, prompt=config["dpo"]["prompt"], temperature=0.7
     )
 
     #avg_r_ref = float(np.mean(rewards_ref))
