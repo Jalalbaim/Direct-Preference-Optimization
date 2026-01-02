@@ -50,7 +50,7 @@ class PPOTrainer:
         reward_model_name = config.get("reward_model", {}).get(
             "name", "distilbert-base-uncased-finetuned-sst-2-english"
         )
-        self.reward_model = RewardModel(reward_model_name)
+        self.reward_model = RewardModel(reward_model_name, device=str(self.device))
 
         # Optimiseur (inclut le value head)
         self.optimizer = AdamW(
