@@ -245,10 +245,12 @@ class PPOTrainer:
         
         # Créer les tenseurs complets (prompt + response)
         full_ids = generated_ids
-        full_mask = torch.ones_like(full_ids)
+        # Créer attention mask avec le bon dtype (float pour le modèle)
+        full_mask = torch.ones_like(full_ids, dtype=torch.long)
 
-        # Masque de réponse
-        response_mask = torch.zeros_like(full_ids)
+        # Masque de réponse (utilisé pour les calculs, doit être en float)
+        model_dtype = next(self.policy_model.parameters()).dtype
+        response_mask = torch.zeros_like(full_ids, dtype=model_dtype)
         response_mask[:, prompt_ids.shape[1]:] = 1
 
         # Décoder les textes
