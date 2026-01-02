@@ -229,6 +229,7 @@ def main():
         original.append(text)
 
         # KL approx: logp_dpo(seq_dpo) - logp_ref(seq_dpo)
+        full_ids_dpo = torch.tensor(full_ids_dpo)
         attn_dpo = (full_ids_dpo != tokenizer.pad_token_id).long()
         logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, device)
         logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, device)
