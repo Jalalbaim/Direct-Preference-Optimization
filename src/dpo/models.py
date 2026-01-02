@@ -35,11 +35,14 @@ def load_models(model_name: str, dtype: str = "bfloat16", device: str = None) ->
 
     tokenizer = load_tokenizer(model_name)
 
+    # Pour Google Colab GPU, ne pas utiliser device_map="auto"
+    # Charger sur CPU puis déplacer vers le device approprié
     policy_model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch_dtype,
-        device_map="auto",
+        low_cpu_mem_usage=True,
     )
+    policy_model = policy_model.to(device)
     
     # Activer gradient checkpointing pour économiser la mémoire
     if hasattr(policy_model, 'gradient_checkpointing_enable'):
@@ -49,8 +52,9 @@ def load_models(model_name: str, dtype: str = "bfloat16", device: str = None) ->
     ref_model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch_dtype,
-        device_map="auto",
+        low_cpu_mem_usage=True,
     )
+    ref_model = ref_model.to(device)
     ref_model.eval()
     for p in ref_model.parameters():
         p.requires_grad = False

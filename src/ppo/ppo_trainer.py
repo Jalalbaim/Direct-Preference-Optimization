@@ -33,6 +33,8 @@ class PPOTrainer:
 
         # Ajouter un value head au policy model pour PPO
         self.policy_model = add_value_head_to_model(self.policy_model)
+        # S'assurer que le modèle est sur le bon device
+        self.policy_model = self.policy_model.to(self.device)
 
         # Paramètres PPO
         self.clip_epsilon = float(config["ppo"]["clip_epsilon"])
