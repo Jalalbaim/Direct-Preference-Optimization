@@ -20,30 +20,47 @@ from src.dpo.utils import load_yaml_config
 
 
 #FUNCTIONS -----------------
-def generate_summary(model, tokenizer, prompt, max_new_tokens=64, temperature=0.8, top_p=0.9, device="cuda"):
-    enc = tokenizer(
-        prompt,
-        return_tensors="pt",
-        truncation=True,
-        max_length=512,
-    ).to(device)
-    input_ids = enc["input_ids"]
-    attn_mask = enc["attention_mask"]
-    prompt_len = input_ids.shape[1]
+def generate_summary(
+    model,
+    tokenizer,
+    prompts,
+    max_new_tokens=64,
+    temperature=0.8,
+    top_p=0.9,
+    device="cuda",
+):
+    with torch.no_grad():
+        enc = tokenizer(
+            prompts,
+            return_tensors="pt",
+            truncation=True,
+            max_length=512,
+            padding=True,
+        ).to(device)
 
-    out = model.generate(
-        input_ids=input_ids,
-        attention_mask=attn_mask,
-        max_new_tokens=max_new_tokens,
-        do_sample=True,
-        temperature=temperature,
-        top_p=top_p,
-        pad_token_id=tokenizer.eos_token_id,
-    )
-    full_ids = out[0]
-    response_ids = full_ids[prompt_len:]
-    response = tokenizer.decode(response_ids, skip_special_tokens=True)
-    return response, full_ids
+        out = model.generate(
+            **enc,
+            max_new_tokens=max_new_tokens,
+            do_sample=True,
+            temperature=temperature,
+            top_p=top_p,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+
+    responses = []
+    full_ids_list = []
+
+    for i in range(len(prompts)):
+        prompt_len = enc["attention_mask"][i].sum()
+        full_ids = out[i]
+        response_ids = full_ids[prompt_len:]
+        response = tokenizer.decode(response_ids, skip_special_tokens=True)
+
+        responses.append(response)
+        full_ids_list.append(full_ids)
+
+    return responses, full_ids_list
+
 
 def generate_win_rate(
     chat_pipeline,
