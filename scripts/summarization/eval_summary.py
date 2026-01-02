@@ -14,9 +14,6 @@ from accelerate.utils import set_module_tensor_to_device
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
 
-from google.colab import userdata #For Colab 
-
-
 from src.dpo.models import load_models, compute_logprobs
 from src.dpo.utils import load_yaml_config
 
@@ -91,6 +88,8 @@ def generate_win_rate(
 def sequence_logprob(model, input_ids, attention_mask, device: str):
     # calcule logp(seq) (somme sur tokens) sous un modèle causal
     input_ids = input_ids.unsqueeze(0).to(device)
+    if attention_mask.dtype == torch.bool:
+        attention_mask = attention_mask.to(dtype=torch.long)
     attention_mask = attention_mask.unsqueeze(0).to(device)
 
     outputs = model(
@@ -231,7 +230,7 @@ def main():
         # KL approx: logp_dpo(seq_dpo) - logp_ref(seq_dpo)
         #if not isinstance(full_ids_dpo, torch.Tensor):
             #full_ids_dpo = torch.tensor(full_ids_dpo)
-        attn_dpo = (full_ids_dpo != tokenizer.pad_token_id)
+        attn_dpo = (full_ids_dpo != tokenizer.pad_token_id).to(dtype=torch.long, device=device)
         logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, device)
         logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, device)
         kl_point = (logp_dpo - logp_ref)  # approx, en nats
