@@ -63,7 +63,7 @@ class ValueHead(nn.Module):
 
     def __init__(self, hidden_size: int):
         super().__init__()
-        self.linear = nn.Linear(hidden_size, 1, dtype="bfloat16")
+        self.linear = nn.Linear(hidden_size, 1, dtype=torch.bfloat16)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """
@@ -92,7 +92,7 @@ def add_value_head_to_model(model: nn.Module) -> nn.Module:
     # Créer et ajouter le value head
     value_head = ValueHead(hidden_size)
     
- 
+    
     model.value_head = value_head
     
     return model
