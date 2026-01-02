@@ -55,48 +55,6 @@ class RewardModel:
         return rewards
 
 
-class SimpleRewardModel:
-    """
-    Modèle de reward simple basé sur des règles.
-    Utile pour le debugging ou des cas simples.
-    """
-
-    def __init__(self, reward_type: str = "length"):
-        self.reward_type = reward_type
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    def compute_rewards(self, texts: List[str]) -> torch.Tensor:
-        """
-        Calcule des rewards simples basés sur des heuristiques.
-        
-        Args:
-            texts: Liste de textes générés
-            
-        Returns:
-            rewards: Tensor [len(texts)]
-        """
-        if self.reward_type == "length":
-            # Reward basé sur la longueur (encourage des réponses de longueur moyenne)
-            rewards = torch.tensor(
-                [min(len(t.split()), 50) / 50.0 for t in texts],
-                dtype=torch.float32,
-                device=self.device,
-            )
-        elif self.reward_type == "positive_words":
-            # Reward basé sur la présence de mots positifs
-            positive_words = {"good", "great", "excellent", "amazing", "wonderful", "fantastic"}
-            rewards = torch.tensor(
-                [sum(1 for word in t.lower().split() if word in positive_words) for t in texts],
-                dtype=torch.float32,
-                device=self.device,
-            )
-        else:
-            # Reward constant
-            rewards = torch.ones(len(texts), dtype=torch.float32, device=self.device)
-
-        return rewards
-
-
 class ValueHead(nn.Module):
     """
     Value head pour PPO.
@@ -105,13 +63,12 @@ class ValueHead(nn.Module):
 
     def __init__(self, hidden_size: int):
         super().__init__()
-        self.linear = nn.Linear(hidden_size, 1)
+        self.linear = nn.Linear(hidden_size, 1, dtype="bfloat16")
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """
         Args:
             hidden_states: [B, L, H] ou [B, H]
-            
         Returns:
             values: [B] ou [B, L]
         """
@@ -135,9 +92,6 @@ def add_value_head_to_model(model: nn.Module) -> nn.Module:
     # Créer et ajouter le value head
     value_head = ValueHead(hidden_size)
     
-    # S'assurer que le value head a le même dtype que le modèle
-    model_dtype = next(model.parameters()).dtype
-    value_head = value_head.to(dtype=model_dtype)
  
     model.value_head = value_head
     
