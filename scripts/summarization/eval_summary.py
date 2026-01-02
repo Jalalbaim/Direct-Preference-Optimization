@@ -169,7 +169,7 @@ def main():
 
     # CarperAI dataset
     dataset = load_dataset("CarperAI/openai_summarize_tldr")
-    test_ds = dataset["test"].select(range(10))
+    test_ds = dataset["test"].select(range(100))
 
     # Chat pipeline
     model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
