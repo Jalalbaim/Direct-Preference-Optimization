@@ -1,5 +1,4 @@
 #IMPORT LIBRARIES -----------------
-
 import os
 import sys
 import argparse
@@ -18,7 +17,6 @@ from src.dpo.models import load_models, compute_logprobs
 from src.dpo.utils import load_yaml_config
 
 
-
 #FUNCTIONS -----------------
 def generate_summary(
     model,
@@ -29,6 +27,9 @@ def generate_summary(
     top_p=0.9,
     device="cuda",
 ):
+    responses = []
+    full_ids_list = []
+
     with torch.no_grad():
         enc = tokenizer(
             prompts,
@@ -45,19 +46,18 @@ def generate_summary(
             temperature=temperature,
             top_p=top_p,
             pad_token_id=tokenizer.eos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
         )
 
-    responses = []
-    full_ids_list = []
+        # Process each prompt separately
+        for i in range(len(prompts)):
+            prompt_len = int(enc["attention_mask"][i].sum())
+            full_ids = out[i]
+            response_ids = full_ids[prompt_len:]
+            response = tokenizer.decode(response_ids, skip_special_tokens=True)
 
-    for i in range(len(prompts)):
-        prompt_len = enc["attention_mask"][i].sum()
-        full_ids = out[i]
-        response_ids = full_ids[prompt_len:]
-        response = tokenizer.decode(response_ids, skip_special_tokens=True)
-
-        responses.append(response)
-        full_ids_list.append(full_ids)
+            responses.append(response)
+            full_ids_list.append(full_ids)
 
     return responses, full_ids_list
 
@@ -76,7 +76,6 @@ def generate_win_rate(
     for sa, sb, txt in tqdm(zip(summaries_a, summaries_b, original_texts), total=len(summaries_a)):
         formatted_prompt = prompt_template.replace("<post>", txt).replace("<Summary A>", sa).replace("<Summary B>", sb)
 
-        # Générer la réponse avec le modèle open source
         response = chat_pipeline(formatted_prompt)
         content = response[0]["generated_text"].strip()
 
@@ -101,18 +100,15 @@ def generate_win_rate(
     return win_rate_a, win_rate_b
 
 
-
 def sequence_logprob(model, input_ids, attention_mask, device: str):
-    # calcule logp(seq) (somme sur tokens) sous un modèle causal
     input_ids = input_ids.unsqueeze(0).to(device)
-    if attention_mask.dtype == torch.bool:
-        attention_mask = attention_mask.to(dtype=torch.long)
     attention_mask = attention_mask.unsqueeze(0).to(device)
 
-    outputs = model(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-    )
+    with torch.no_grad():
+        outputs = model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+        )
     logits = outputs.logits  # [1, L, V]
     shift_logits = logits[:, :-1, :].contiguous()
     shift_labels = input_ids[:, 1:].contiguous()
@@ -120,10 +116,8 @@ def sequence_logprob(model, input_ids, attention_mask, device: str):
 
     log_probs = torch.log_softmax(shift_logits, dim=-1)
     token_logps = log_probs.gather(-1, shift_labels.unsqueeze(-1)).squeeze(-1)
-    token_logps = token_logps * shift_attn  # ignore padding
+    token_logps = token_logps * shift_attn
     return token_logps.sum().item()
-
-
 
 
 #MAIN FUNCTION -----------------
@@ -158,37 +152,27 @@ def main():
     if args.dpo_checkpoint and os.path.exists(args.dpo_checkpoint):
         ckpt = torch.load(args.dpo_checkpoint, map_location="cpu")
         state_dict = ckpt["model_state_dict"]
-        
         for name, tensor in state_dict.items():
             try:
                 set_module_tensor_to_device(policy_model, name, device=0, value=tensor)
             except Exception as e:
                 print(f"Skipping key {name} due to: {e}")
-                
         print(f"Successfully loaded DPO checkpoint: {args.dpo_checkpoint}")
     else:
         print("WARNING: DPO checkpoint not found, using base model as policy.")
 
-
-    policy_device = "cuda"
-    ref_device = "cpu"
-
-    ref_model.to(ref_device)
-    policy_model.to(policy_device)
+    # Keep both models on GPU if possible
+    ref_model.to(device)
+    policy_model.to(device)
     ref_model.eval()
     policy_model.eval()
-    
 
     # CarperAI dataset
     dataset = load_dataset("CarperAI/openai_summarize_tldr")
     test_ds = dataset["test"].select(range(10))
 
-    # Evaluation
-    kls = []
-
     # Chat pipeline
-    # Charger le modèle open source (Mistral-7B)
-    model_name = "mistralai/Mistral-7B-Instruct-v0.1"
+    model_name = "EleutherAI/gpt-j-6B"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -197,7 +181,6 @@ def main():
         low_cpu_mem_usage=True,
     )
 
-    # Créer un pipeline pour générer les réponses
     chat_pipeline = pipeline(
         "text-generation",
         model=model,
@@ -208,10 +191,10 @@ def main():
         do_sample=True,
     )
 
-    # Summary data
     summaries_a = []
     summaries_b = []
     original = []
+    kls = []
 
     n = min(args.num_examples, len(test_ds))
     print(f"Evaluating on {n} summary test examples")
@@ -223,67 +206,49 @@ def main():
             continue
 
         # ref
-        print("CHECKPOINT 1")
         resp_ref, full_ids_ref = generate_summary(
             ref_model,
             policy_tokenizer,
-            prompt,
+            [prompt],  # pass as list
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
             top_p=args.top_p,
-            device=ref_device,
+            device=device,
         )
+        resp_ref = resp_ref[0]
+        full_ids_ref = full_ids_ref[0]
 
         # DPO
-        print("CHECKPOINT 2")
         resp_dpo, full_ids_dpo = generate_summary(
             policy_model,
             policy_tokenizer,
-            prompt,
+            [prompt],
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
             top_p=args.top_p,
-            device=policy_device,
+            device=device,
         )
+        resp_dpo = resp_dpo[0]
+        full_ids_dpo = full_ids_dpo[0]
 
-        print("CHECKPOINT 3")
         summaries_a.append(resp_dpo)
         summaries_b.append(resp_ref)
         original.append(text)
 
-        # KL approx: logp_dpo(seq_dpo) - logp_ref(seq_dpo)
-        #if not isinstance(full_ids_dpo, torch.Tensor):
-            #full_ids_dpo = torch.tensor(full_ids_dpo)
-        print("CHECKPOINT 4")
-        attn_dpo = torch.ones_like(full_ids_dpo, dtype=torch.long, device=policy_device)
-
-        print("CHECKPOINT 5")
-        logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, policy_device)
-
-        print("CHECKPOINT 6")
-        logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, ref_device)
-
-        print("CHECKPOINT 7")
-        kl_point = (logp_dpo - logp_ref)  # approx, en nats
-
-        print("CHECKPOINT 8")
-        kls.append(kl_point)
+        attn_dpo = (full_ids_dpo != policy_tokenizer.pad_token_id).long().to(device)
+        logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, device)
+        logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, device)
+        kls.append(logp_dpo - logp_ref)
 
     import numpy as np
-
-    print("CHECKPOINT 9")
     win_rate_a, win_rate_b = generate_win_rate(
         chat_pipeline, summaries_a, summaries_b, original, prompt_template=config["dpo"]["prompt"], temperature=0.7
     )
 
-    #avg_r_ref = float(np.mean(rewards_ref))
-    #avg_r_dpo = float(np.mean(rewards_dpo))
     gpt4_win_rate = sum(win_rate_a) / len(win_rate_a) if win_rate_a else 0.0
     avg_kl = float(np.mean(kls)) if kls else 0.0
 
     print("==== Sentiment DPO Evaluation ====")
-    #print(f"Avg reward (ref): {avg_r_ref:.4f}")
-    #print(f"Avg reward (DPO): {avg_r_dpo:.4f}")
     print(f"Mistral win-rate (DPO > ref): {gpt4_win_rate:.3f}")
     print(f"Approx KL (DPO || ref): {avg_kl:.4f}")
 
