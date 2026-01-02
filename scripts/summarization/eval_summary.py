@@ -206,6 +206,7 @@ def main():
             continue
 
         # ref
+        print("CHECKPOINT 1")
         resp_ref, full_ids_ref = generate_summary(
             ref_model,
             policy_tokenizer,
@@ -217,6 +218,7 @@ def main():
         )
 
         # DPO
+        print("CHECKPOINT 2")
         resp_dpo, full_ids_dpo = generate_summary(
             policy_model,
             policy_tokenizer,
@@ -227,6 +229,7 @@ def main():
             device=policy_device,
         )
 
+        print("CHECKPOINT 3")
         summaries_a.append(resp_dpo)
         summaries_b.append(resp_ref)
         original.append(text)
@@ -234,13 +237,24 @@ def main():
         # KL approx: logp_dpo(seq_dpo) - logp_ref(seq_dpo)
         #if not isinstance(full_ids_dpo, torch.Tensor):
             #full_ids_dpo = torch.tensor(full_ids_dpo)
-        attn_dpo = torch.ones_like(full_ids_dpo, dtype=torch.long, device=device)
-        logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, device)
-        logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, device)
+        print("CHECKPOINT 4")
+        attn_dpo = torch.ones_like(full_ids_dpo, dtype=torch.long, device=policy_device)
+
+        print("CHECKPOINT 5")
+        logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, policy_device)
+
+        print("CHECKPOINT 6")
+        logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, ref_device)
+
+        print("CHECKPOINT 7")
         kl_point = (logp_dpo - logp_ref)  # approx, en nats
+
+        print("CHECKPOINT 8")
         kls.append(kl_point)
 
     import numpy as np
+
+    print("CHECKPOINT 9")
     win_rate_a, win_rate_b = generate_win_rate(
         chat_pipeline, summaries_a, summaries_b, original, prompt_template=config["dpo"]["prompt"], temperature=0.7
     )
