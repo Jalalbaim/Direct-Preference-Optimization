@@ -133,7 +133,7 @@ def main():
     print(f"Loading reference + policy models from: {ref_model_name}")
 
     mb = load_models(ref_model_name, dtype=config["model"]["dtype"])
-    tokenizer = mb.tokenizer
+    policy_tokenizer = mb.tokenizer
     ref_model = mb.ref_model
     policy_model = mb.policy_model
 
@@ -204,7 +204,7 @@ def main():
         # ref
         resp_ref, full_ids_ref = generate_summary(
             ref_model,
-            tokenizer,
+            policy_tokenizer,
             prompt,
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
@@ -215,7 +215,7 @@ def main():
         # DPO
         resp_dpo, full_ids_dpo = generate_summary(
             policy_model,
-            tokenizer,
+            policy_tokenizer,
             prompt,
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
@@ -230,7 +230,7 @@ def main():
         # KL approx: logp_dpo(seq_dpo) - logp_ref(seq_dpo)
         #if not isinstance(full_ids_dpo, torch.Tensor):
             #full_ids_dpo = torch.tensor(full_ids_dpo)
-        attn_dpo = (full_ids_dpo != tokenizer.pad_token_id).to(dtype=torch.long, device=device)
+        attn_dpo = torch.ones_like(full_ids_dpo, dtype=torch.long, device=device)
         logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, device)
         logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, device)
         kl_point = (logp_dpo - logp_ref)  # approx, en nats
