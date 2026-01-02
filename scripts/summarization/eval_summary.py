@@ -7,15 +7,13 @@ import argparse
 import torch
 from datasets import load_dataset
 from tqdm.auto import tqdm
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from transformers import BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import BitsAndBytesConfig, pipeline
 from accelerate.utils import set_module_tensor_to_device
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
-api_key = os.getenv("OPENAI_API_KEY")
 
-from openai import OpenAI
 from google.colab import userdata #For Colab 
 
 
@@ -51,30 +49,23 @@ def generate_summary(model, tokenizer, prompt, max_new_tokens=64, temperature=0.
     return response, full_ids
 
 def generate_win_rate(
-    client,
+    chat_pipeline,
     summaries_a: list[str],
     summaries_b: list[str],
     original_texts: list[str],
-    prompt_template: str, 
+    prompt_template: str,
     temperature: float):
 
     win_rate_a = []
     win_rate_b = []
 
     for sa, sb, txt in tqdm(zip(summaries_a, summaries_b, original_texts), total=len(summaries_a)):
-        formatted_prompt = prompt_template.replace("<post>", txt)\
-                                           .replace("<Summary A>", sa)\
-                                           .replace("<Summary B>", sb)
+        formatted_prompt = prompt_template.replace("<post>", txt).replace("<Summary A>", sa).replace("<Summary B>", sb)
 
-        response = client.chat.completions.create(
-            model="gpt-4.1-mini", 
-            messages=[{"role": "user", "content": formatted_prompt}],
-            temperature=temperature,
-            max_tokens=200
-        )
+        # Générer la réponse avec le modèle open source
+        response = chat_pipeline(formatted_prompt)
+        content = response[0]["generated_text"].strip()
 
-        content = response.choices[0].message.content.strip()
-        
         lines = content.split("\n")
         choice = "None"
         for line in lines:
@@ -89,11 +80,12 @@ def generate_win_rate(
             win_rate_a.append(0)
             win_rate_b.append(1)
         else:
-            print(f"Warning: GPT-4 gave an unclear answer: {content}")
+            print(f"Warning: The model gave an unclear answer: {content}")
             win_rate_a.append(0)
             win_rate_b.append(0)
 
     return win_rate_a, win_rate_b
+
 
 
 def sequence_logprob(model, input_ids, attention_mask, device: str):
@@ -174,14 +166,27 @@ def main():
     # Evaluation
     kls = []
 
-    # OPEN AI KEY
-    try:
-        #api_key = userdata.get('OPENAI_API_KEY')
-        client = OpenAI(api_key=api_key)
-    except Exception as e:
-        print(f"Erreur réelle : {e}")
-        print("Error: Could not find OPENAI_API_KEY in Colab Secrets.")
-        return
+    # Chat pipeline
+    # Charger le modèle open source (Mistral-7B)
+    model_name = "mistralai/Mistral-7B-Instruct-v0.1"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        device_map="auto",
+        torch_dtype=torch.float16,
+        low_cpu_mem_usage=True,
+    )
+
+    # Créer un pipeline pour générer les réponses
+    chat_pipeline = pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        max_new_tokens=200,
+        temperature=0.7,
+        top_p=0.9,
+        do_sample=True,
+    )
 
     # Summary data
     summaries_a = []
@@ -232,7 +237,7 @@ def main():
 
     import numpy as np
     win_rate_a, win_rate_b = generate_win_rate(
-        client, summaries_a, summaries_b, original, prompt_template=config["dpo"]["prompt"], temperature=0.7
+        chat_pipeline, summaries_a, summaries_b, original, prompt_template=config["dpo"]["prompt"], temperature=0.7
     )
 
     #avg_r_ref = float(np.mean(rewards_ref))
@@ -243,7 +248,7 @@ def main():
     print("==== Sentiment DPO Evaluation ====")
     #print(f"Avg reward (ref): {avg_r_ref:.4f}")
     #print(f"Avg reward (DPO): {avg_r_dpo:.4f}")
-    print(f"GPT win-rate (DPO > ref): {gpt4_win_rate:.3f}")
+    print(f"Mistral win-rate (DPO > ref): {gpt4_win_rate:.3f}")
     print(f"Approx KL (DPO || ref): {avg_kl:.4f}")
 
 
