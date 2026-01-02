@@ -14,6 +14,12 @@ class PreferenceExample:
     rejected: str # y_l
 
 
+@dataclass
+class PromptExample:
+    """Exemple simple avec juste un prompt (pour PPO/GRPO)"""
+    prompt: str
+
+
 class PreferenceDataset(Dataset):
     """
     Dataset de paires (prompt, chosen, rejected) à partir d'un fichier JSONL.
@@ -122,3 +128,50 @@ def preference_collate_fn(
         "rejected_response_mask": response_mask_rejected,
     }
     return batch_dict
+
+
+class PromptDataset(Dataset):
+    """
+    Dataset de prompts seulement (pour PPO/GRPO).
+    Chaque ligne doit contenir: { "prompt": "..." }
+    """
+
+    def __init__(self, path: str):
+        self.examples: List[PromptExample] = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                obj = json.loads(line)
+                self.examples.append(PromptExample(prompt=obj["prompt"]))
+
+    def __len__(self) -> int:
+        return len(self.examples)
+
+    def __getitem__(self, idx: int) -> PromptExample:
+        return self.examples[idx]
+
+
+def prompt_collate_fn(
+    batch: List[PromptExample],
+    tokenizer: PreTrainedTokenizerBase,
+    max_prompt_length: int,
+) -> Dict[str, Any]:
+    """
+    Collate pour transformer une liste de prompts en batch tensors.
+    """
+    prompts = [ex.prompt for ex in batch]
+
+    # Tokenisation
+    prompt_enc = tokenizer(
+        prompts,
+        padding=True,
+        truncation=True,
+        max_length=max_prompt_length,
+        return_tensors="pt",
+    )
+
+    return {
+        "input_ids": prompt_enc["input_ids"],
+        "attention_mask": prompt_enc["attention_mask"],
+    }

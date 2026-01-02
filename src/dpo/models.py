@@ -21,9 +21,12 @@ def load_tokenizer(model_name: str) -> AutoTokenizer:
     return tokenizer
 
 
-def load_models(model_name: str, dtype: str = "bfloat16") -> ModelBundle:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+def load_models(model_name: str, dtype: str = "bfloat16", device: str = None) -> ModelBundle:
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        device = torch.device(device)
+        
     torch_dtype = {
         "float32": torch.float32,
         "float16": torch.float16,

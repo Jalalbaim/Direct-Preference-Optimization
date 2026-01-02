@@ -1,0 +1,38 @@
+experiment_name: "grpo_sentiment_tinyllama"
+
+model:
+  name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  dtype: "bfloat16"
+  use_flash_attention: false
+
+training:
+  seed: 42
+  num_epochs: 1
+  batch_size: 2
+  learning_rate: 1e-5
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  warmup_steps: 100
+
+grpo:
+  group_size: 4            # Nombre de réponses générées par prompt
+  clip_epsilon: 0.2        # Clipping epsilon (comme PPO)
+  beta: 0.1                # Coefficient KL (comme DPO)
+  num_grpo_epochs: 4       # Nombre d'epochs GRPO par batch
+
+reward_model:
+  name: "distilbert-base-uncased-finetuned-sst-2-english"
+
+generation:
+  max_length: 128
+  temperature: 0.7
+  top_p: 0.9
+
+data:
+  prompt_path: "data/processed/sentiment/prompts.jsonl"
+  max_prompt_length: 256
+
+logging:
+  save_dir: "checkpoints/sentiment_grpo"
+  log_every: 10
+  eval_every: 100

@@ -101,7 +101,13 @@ def main():
     args = parser.parse_args()
 
     config = load_yaml_config(args.config)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+    
     print(f"Using device: {device}")
 
     # Ref model & policy model DPO

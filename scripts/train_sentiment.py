@@ -22,7 +22,7 @@ def main():
     dtype = config["model"]["dtype"]
 
     # modèles + tokenizer
-    mb = load_models(model_name, dtype=dtype)
+    mb = load_models(model_name, dtype=dtype, device='mps' if torch.backends.mps.is_available() else None)
     tokenizer = mb.tokenizer
 
     # datasets
