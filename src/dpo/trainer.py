@@ -77,7 +77,6 @@ class DPOTrainer:
             save_checkpoint(self.policy_model, self.optimizer, ckpt_path)
 
     def _train_step(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
-        # déplacer batch sur device
         batch = {k: v.to(self.device) for k, v in batch.items()}
 
         # log-probs policy
@@ -120,7 +119,6 @@ class DPOTrainer:
         loss = loss / self.grad_accum
         loss.backward()
         
-        # Libérer le cache CUDA pour économiser de la mémoire
         torch.cuda.empty_cache()
 
         return loss

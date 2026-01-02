@@ -86,6 +86,40 @@ def sequence_logprob(model, input_ids, attention_mask, device: str):
     return token_logps.sum().item()
 
 
+@torch.no_grad()
+def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, device: str):
+    """
+    Compute true KL(policy || ref) = Sum over vocab [ P_policy(w) * (log P_policy(w) - log P_ref(w)) ]
+    at each token position in the sequence.
+    """
+    input_ids = input_ids.unsqueeze(0).to(device)
+    attention_mask = attention_mask.unsqueeze(0).to(device)
+
+    # Get logits from both models
+    policy_outputs = policy_model(input_ids=input_ids, attention_mask=attention_mask)
+    ref_outputs = ref_model(input_ids=input_ids, attention_mask=attention_mask)
+    
+    policy_logits = policy_outputs.logits[:, :-1, :].contiguous()  # [1, L-1, V]
+    ref_logits = ref_outputs.logits[:, :-1, :].contiguous()        # [1, L-1, V]
+    
+    shift_attn = attention_mask[:, 1:].contiguous()  # [1, L-1]
+    
+    # Compute probability distributions
+    policy_probs = torch.softmax(policy_logits, dim=-1)  # [1, L-1, V]
+    policy_log_probs = torch.log_softmax(policy_logits, dim=-1)  # [1, L-1, V]
+    ref_log_probs = torch.log_softmax(ref_logits, dim=-1)  # [1, L-1, V]
+    
+    # KL divergence: sum_w [ P(w) * (log P(w) - log Q(w)) ]
+    # = sum_w [ P(w) * log P(w) ] - sum_w [ P(w) * log Q(w) ]
+    kl_per_position = (policy_probs * (policy_log_probs - ref_log_probs)).sum(dim=-1)  # [1, L-1]
+    
+    # Mask out padding positions and sum
+    kl_per_position = kl_per_position * shift_attn  # [1, L-1]
+    kl_divergence = kl_per_position.sum().item()
+    
+    return kl_divergence
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/sentiment.yaml")
@@ -186,11 +220,9 @@ def main():
         if r_dpo > r_ref:
             wins += 1
 
-        # KL approx: logp_dpo(seq_dpo) - logp_ref(seq_dpo)
+        # KL divergence: KL(policy || ref) computed token-by-token
         attn_dpo = (full_ids_dpo != tokenizer.pad_token_id).long()
-        logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, device)
-        logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, device)
-        kl_point = (logp_dpo - logp_ref)  # approx, en nats
+        kl_point = compute_kl_divergence(policy_model, ref_model, full_ids_dpo, attn_dpo, device)
         kls.append(kl_point)
 
     import numpy as np
@@ -204,7 +236,7 @@ def main():
     print(f"Avg reward (ref): {avg_r_ref:.4f}")
     print(f"Avg reward (DPO): {avg_r_dpo:.4f}")
     print(f"Win-rate (DPO > ref): {win_rate:.3f}")
-    print(f"Approx KL (DPO || ref): {avg_kl:.4f}")
+    print(f"Avg KL(DPO || ref): {avg_kl:.4f}")
 
 
 if __name__ == "__main__":
