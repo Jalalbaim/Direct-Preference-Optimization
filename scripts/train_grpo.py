@@ -10,7 +10,7 @@ sys.path.append(ROOT)
 
 from src.dpo.models import load_models
 from src.dpo.data import PromptDataset, prompt_collate_fn
-from src.dpo.grpo_trainer import GRPOTrainer
+from grpo.grpo_trainer import GRPOTrainer
 from src.dpo.utils import load_yaml_config
 
 

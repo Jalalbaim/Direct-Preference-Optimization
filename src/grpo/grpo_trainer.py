@@ -7,9 +7,9 @@ from torch.optim import AdamW
 from tqdm.auto import tqdm
 
 from .grpo_losses import grpo_loss
-from .models import ModelBundle
-from .reward_models import RewardModel
-from .utils import set_seed, save_checkpoint
+from ..dpo.models import ModelBundle
+from ..dpo.reward_models import RewardModel
+from ..dpo.utils import set_seed, save_checkpoint
 
 
 class GRPOTrainer:

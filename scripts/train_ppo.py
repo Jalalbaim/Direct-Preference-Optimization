@@ -21,17 +21,8 @@ def main():
     model_name = config["model"]["name"]
     dtype = config["model"]["dtype"]
 
-    # Désactiver MPS pour éviter les erreurs avec embeddings
-    # MPS a des problèmes de compatibilité avec certaines opérations
-    import os
-    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-    
-    # Forcer CPU sur macOS si problèmes MPS
-    device = "cpu"  # Ou "cuda" si GPU NVIDIA disponible
-    print(f"Using device: {device}")
-
     # Charger les modèles
-    mb = load_models(model_name, dtype=dtype, device=device)
+    mb = load_models(model_name, dtype=dtype)
     tokenizer = mb.tokenizer
 
     # Dataset de prompts
