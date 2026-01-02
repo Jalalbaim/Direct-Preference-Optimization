@@ -135,10 +135,10 @@ def add_value_head_to_model(model: nn.Module) -> nn.Module:
     # Créer et ajouter le value head
     value_head = ValueHead(hidden_size)
     
-    
-    
-
-    # Ajouter au modèle
+    # S'assurer que le value head a le même dtype que le modèle
+    model_dtype = next(model.parameters()).dtype
+    value_head = value_head.to(dtype=model_dtype)
+ 
     model.value_head = value_head
     
     return model
