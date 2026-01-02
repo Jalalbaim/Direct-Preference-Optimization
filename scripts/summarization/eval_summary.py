@@ -152,8 +152,12 @@ def main():
     else:
         print("WARNING: DPO checkpoint not found, using base model as policy.")
 
-    ref_model.to(device)
-    policy_model.to(device)
+
+    policy_device = "cuda"
+    ref_device = "cpu"
+
+    ref_model.to(ref_device)
+    policy_model.to(policy_device)
     ref_model.eval()
     policy_model.eval()
     
@@ -209,7 +213,7 @@ def main():
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
             top_p=args.top_p,
-            device=device,
+            device=ref_device,
         )
 
         # DPO
@@ -220,7 +224,7 @@ def main():
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
             top_p=args.top_p,
-            device=device,
+            device=policy_device,
         )
 
         summaries_a.append(resp_dpo)
