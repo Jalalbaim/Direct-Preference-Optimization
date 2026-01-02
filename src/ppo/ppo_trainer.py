@@ -118,6 +118,9 @@ class PPOTrainer:
 
         # 2. Calculer les rewards
         rewards = self.reward_model.compute_rewards(generated_data["texts"])
+        # Convertir rewards au dtype du policy model
+        model_dtype = next(self.policy_model.parameters()).dtype
+        rewards = rewards.to(dtype=model_dtype)
 
         # 3. Calculer les values et advantages
         with torch.no_grad():

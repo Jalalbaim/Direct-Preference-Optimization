@@ -92,6 +92,9 @@ def add_value_head_to_model(model: nn.Module) -> nn.Module:
     # Créer et ajouter le value head
     value_head = ValueHead(hidden_size)
     
+    # S'assurer que le value head a le même dtype et device que le modèle
+    model_param = next(model.parameters())
+    value_head = value_head.to(dtype=model_param.dtype, device=model_param.device)
     
     model.value_head = value_head
     
