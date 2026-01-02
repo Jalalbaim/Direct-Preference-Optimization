@@ -63,7 +63,8 @@ class ValueHead(nn.Module):
 
     def __init__(self, hidden_size: int):
         super().__init__()
-        self.linear = nn.Linear(hidden_size, 1, dtype=torch.bfloat16)
+        # Ne pas spécifier dtype ici, il sera défini par .to() plus tard
+        self.linear = nn.Linear(hidden_size, 1)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """
