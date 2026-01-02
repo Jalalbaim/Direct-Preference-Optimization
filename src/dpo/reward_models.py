@@ -132,8 +132,14 @@ def add_value_head_to_model(model: nn.Module) -> nn.Module:
     # Obtenir la taille des hidden states
     hidden_size = model.config.hidden_size
     
-    # Créer et ajouter le value head
+    # Créer le value head
     value_head = ValueHead(hidden_size)
+    
+    # Déplacer vers le même device que le modèle
+    device = next(model.parameters()).device
+    value_head = value_head.to(device)
+    
+    # Ajouter au modèle
     model.value_head = value_head
     
     return model
