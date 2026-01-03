@@ -3,7 +3,7 @@ import re
 
 # --- Sample data ---
 post = "About 3 weeks ago, I got a job at a grocery store as a stock boy. I was so happy that I could start saving up and buying more expensive things (Like a goddamn"
-summary_a = "Got fired from my first job after 3 weeks. Lost my ability to save money and now I have to go back to living paycheck to paycheck."
+summary_a = "Got fired from my first job after 3 weeks while working at a grocery store and being happy. Lost my ability to save money and now I have to go back to living paycheck to paycheck."
 summary_b = "Got fired from my first job for being too slow. Got another job, but I could only work until 4pm."
 
 # --- Load model ---
@@ -21,7 +21,7 @@ judge_pipeline = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
-    max_new_tokens=12,  # Allow more tokens for the explanation
+    max_new_tokens=16,  # Allow more tokens for the explanation
     do_sample=False,
 )
 
@@ -40,6 +40,7 @@ Summary B:
 {summary_b}
 
 Provide your response in the following format:
+Comparison: <one-sentence comparison and explanation>
 Preferred: <"A" or "B">
 
 After providing your answer, stop generating further text.<|im_end|>
