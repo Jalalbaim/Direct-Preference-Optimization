@@ -50,7 +50,7 @@ class PPOTrainer:
 
         # Reward model
         reward_model_name = config.get("reward_model", {}).get(
-            "name", "distilbert-base-uncased-finetuned-sst-2-english"
+            "name", "lvwerra/distilbert-imdb"
         )
         self.reward_model = RewardModel(reward_model_name, device=str(self.device))
 

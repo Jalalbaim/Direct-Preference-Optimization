@@ -25,7 +25,7 @@ ppo:
   use_kl_early_stop: true  # Activer l'arrêt précoce basé sur KL
 
 reward_model:
-  name: "distilbert-base-uncased-finetuned-sst-2-english"
+  name: "lvwerra/distilbert-imdb"
 
 generation:
   max_length: 128
