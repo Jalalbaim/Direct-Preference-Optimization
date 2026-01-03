@@ -26,10 +26,11 @@ judge_pipeline = pipeline(
 )
 
 # --- Construct a short, clear prompt ---
-prompt = f"""Post: {post}
+prompt = f"""
+Which summary of the following post is better? Respond ONLY with the single letter A or B. Do not add any other text or explanation.
+Post: {post}
 Summary A: {summary_a}
 Summary B: {summary_b}
-Which summary is better? Respond ONLY with the single letter A or B. Do not add any other text or explanation.
 """
 
 
