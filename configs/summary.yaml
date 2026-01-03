@@ -48,4 +48,4 @@ logging:
   eval_every: 100
 
 testing:
-  prompt_nb: 200
+  prompt_nb: 50
