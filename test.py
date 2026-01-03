@@ -7,7 +7,7 @@ summary_b="Got fired from my first job for being too slow. Got another job, but 
 
 
 # --- Load judge model (TinyLlama) ---
-judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+judge_name = "distilbert/distilgpt2"
 tokenizer = AutoTokenizer.from_pretrained(judge_name)
 model = AutoModelForCausalLM.from_pretrained(
     judge_name,
