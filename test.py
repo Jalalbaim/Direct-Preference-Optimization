@@ -7,7 +7,7 @@ summary_b="Got fired from my first job for being too slow. Got another job, but 
 
 
 # --- Load judge model (TinyLlama) ---
-judge_name = "distilbert/distilgpt2" # Found : https://huggingface.co/docs/transformers/tasks/language_modeling 
+judge_name = "facebook/opt-125m" # Found : https://huggingface.co/docs/transformers/tasks/language_modeling 
 tokenizer = AutoTokenizer.from_pretrained(judge_name)
 model = AutoModelForCausalLM.from_pretrained(
     judge_name,
