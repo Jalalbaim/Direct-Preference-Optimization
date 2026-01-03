@@ -1,63 +1,44 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
-# -----------------------------
-# Load a small judge model for testing
-# -----------------------------
+# --- Sample data ---
+post = "I went to the store to buy some fruits, but they were out of apples. I bought oranges instead and returned home."
+summary_a = "The person wanted apples but bought oranges."
+summary_b = "Someone went shopping for apples and oranges."
+
+# --- Load judge model (TinyLlama) ---
 judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 tokenizer = AutoTokenizer.from_pretrained(judge_name)
 model = AutoModelForCausalLM.from_pretrained(
     judge_name,
     device_map="auto",
     torch_dtype="auto",
-    low_cpu_mem_usage=True,
+    low_cpu_mem_usage=True
 )
 
-# Greedy pipeline for deterministic output
+# --- Create pipeline ---
 judge_pipeline = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
-    max_new_tokens=16,  # just enough for "A" or "B"
-    do_sample=False,    # greedy decoding
+    max_new_tokens=16,  # only need a few tokens for A/B
+    do_sample=False,    # deterministic output
 )
 
-# -----------------------------
-# Sample post and summaries
-# -----------------------------
-post = """I went to the store to buy some fruits, but they were out of apples. I bought oranges instead and returned home."""
-summary_a = "The person wanted apples but bought oranges."
-summary_b = "Someone went shopping for apples and oranges."
-
-# -----------------------------
-# Build a minimal prompt
-# -----------------------------
+# --- Construct a short, clear prompt ---
 prompt = f"""
-Post:
-{post}
-
-Summary A:
-{summary_a}
-
-Summary B:
-{summary_b}
-
-Which summary is better? ONLY respond with "A" or "B".
+Post: {post}
+Summary A: {summary_a}
+Summary B: {summary_b}
+Which summary is better? Respond ONLY with the single letter A or B.
 """
 
-# -----------------------------
-# Get judge response
-# -----------------------------
-response = judge_pipeline(prompt)
-output = response[0]["generated_text"].strip()
+# --- Get model output ---
+output = judge_pipeline(prompt)
+raw_text = output[0]["generated_text"]
+print("Judge raw output:\n", raw_text)
 
-# -----------------------------
-# Parse the choice
-# -----------------------------
-choice = None
-if output.upper().startswith("A"):
-    choice = "A"
-elif output.upper().startswith("B"):
-    choice = "B"
-
-print("Judge raw output:", output)
+# --- Parse output: look for A or B ---
+import re
+match = re.search(r"\b(A|B)\b", raw_text)
+choice = match.group(1) if match else None
 print("Parsed choice:", choice)
