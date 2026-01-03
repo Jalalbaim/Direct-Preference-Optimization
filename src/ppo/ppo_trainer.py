@@ -6,6 +6,13 @@ from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from tqdm.auto import tqdm
 
+try:
+    import bitsandbytes as bnb
+    BNB_AVAILABLE = True
+except ImportError:
+    BNB_AVAILABLE = False
+    print("Warning: bitsandbytes not available. Using standard AdamW optimizer.")
+
 from .ppo_losses import ppo_loss, compute_gae
 from ..dpo.models import compute_logprobs, ModelBundle
 from ..dpo.reward_models import RewardModel, add_value_head_to_model
@@ -31,6 +38,14 @@ class PPOTrainer:
         self.policy_model = self.mb.policy_model
         self.ref_model = self.mb.ref_model
 
+        # Activer gradient checkpointing pour économiser la mémoire
+        use_gradient_checkpointing = config.get("training", {}).get(
+            "gradient_checkpointing", True
+        )
+        if use_gradient_checkpointing and hasattr(self.policy_model, 'gradient_checkpointing_enable'):
+            self.policy_model.gradient_checkpointing_enable()
+            print("✓ Gradient checkpointing activé (économie ~30-40% d'activations)")
+        
         # Ajouter un value head au policy model pour PPO
         self.policy_model = add_value_head_to_model(self.policy_model)
         # S'assurer que le modèle est sur le bon device
@@ -55,11 +70,25 @@ class PPOTrainer:
         self.reward_model = RewardModel(reward_model_name, device=str(self.device))
 
         # Optimiseur (inclut le value head)
-        self.optimizer = AdamW(
-            self.policy_model.parameters(),
-            lr=float(config["training"]["learning_rate"]),
-            weight_decay=float(config["training"]["weight_decay"]),
+        use_8bit_optimizer = config.get("training", {}).get(
+            "use_8bit_optimizer", True
         )
+        
+        if use_8bit_optimizer and BNB_AVAILABLE:
+            self.optimizer = bnb.optim.AdamW8bit(
+                self.policy_model.parameters(),
+                lr=float(config["training"]["learning_rate"]),
+                weight_decay=float(config["training"]["weight_decay"]),
+            )
+            print("✓ Optimiseur 8-bit activé (économie ~50% sur états optimiseur)")
+        else:
+            self.optimizer = AdamW(
+                self.policy_model.parameters(),
+                lr=float(config["training"]["learning_rate"]),
+                weight_decay=float(config["training"]["weight_decay"]),
+            )
+            if use_8bit_optimizer and not BNB_AVAILABLE:
+                print("⚠ Optimiseur 8-bit demandé mais bitsandbytes non disponible")
 
         self.max_grad_norm = config["training"]["max_grad_norm"]
         self.max_gen_length = config["generation"]["max_length"]
