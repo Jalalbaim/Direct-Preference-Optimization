@@ -20,17 +20,19 @@ judge_pipeline = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
-    max_new_tokens=16,  # only need a few tokens for A/B
+    max_new_tokens=32,  # only need a few tokens for A/B
     do_sample=False,    # deterministic output
 )
 
 # --- Construct a short, clear prompt ---
-prompt = f"""
+prompt = f"""<|im_start|>user
 Post: {post}
 Summary A: {summary_a}
 Summary B: {summary_b}
-Which summary is better? Respond ONLY with the single letter A or B.
+Which summary is better? Respond ONLY with the single letter A or B.<|im_end|>
+<|im_start|>assistant
 """
+
 
 # --- Get model output ---
 output = judge_pipeline(prompt)
