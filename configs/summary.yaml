@@ -19,16 +19,24 @@ dpo:
   beta: 0.1  # hyperparam DPO
   label_smoothing: 0.0
   prompt: |
+    <|im_start|>user
+    Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details? A good summary is both precise and concise.
+
     Post:
-    <original_post>
+    {post}
 
     Summary A:
-    <summary_a>
+    {summary_a}
 
     Summary B:
-    <summary_b>
+    {summary_b}
 
-    Which summary is better? ONLY respond with "A" or "B". Nothing else.
+    Provide your response in the following format:
+    Comparison: <one-sentence comparison and explanation>
+    Preferred: <"A" or "B">
+
+    After providing your answer, stop generating further text.<|im_end|>
+    <|im_start|>assistant
 
 
 

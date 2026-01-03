@@ -9,6 +9,7 @@ from datasets import load_dataset
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from accelerate.utils import set_module_tensor_to_device
+import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
@@ -97,16 +98,8 @@ def generate_win_rate(
         print(content)
         print("==== End of Judge Output ====")
 
-        content = response[0]["generated_text"].strip().upper()
-        if content.startswith("A"):
-            choice = "A"
-        elif content.startswith("B"):
-            choice = "B"
-        else:
-            choice = "None"  # or skip this example
-
-
-        print("ANALYSIS OF JUDGE OUTPUT = %s \n" % choice)
+        match = re.search(r'Preferred:\s*["\']?([AB])["\']?', content, re.IGNORECASE)
+        choice = match.group(1).upper() if match else "None"
 
         if "A" in choice:
             win_rate_a.append(1)
@@ -215,10 +208,9 @@ def main():
         "text-generation",
         model=judge_model,
         tokenizer=judge_tokenizer,
-        max_new_tokens=128,
+        max_new_tokens=16,
         temperature=0.7,
-        top_p=0.9,
-        do_sample=True,
+        do_sample=False,
     )
 
     summaries_a, summaries_b, originals, kls = [], [], [], []
