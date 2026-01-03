@@ -7,7 +7,7 @@ summary_a = "Got fired from my first job after 3 weeks. Lost my ability to save 
 summary_b = "Got fired from my first job for being too slow. Got another job, but I could only work until 4pm."
 
 # --- Load model ---
-model_name = "gpt2"
+model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
