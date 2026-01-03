@@ -7,7 +7,7 @@ summary_b="Got fired from my first job for being too slow. Got another job, but 
 
 
 # --- Load judge model (TinyLlama) ---
-judge_name = "distilbert/distilgpt2"
+judge_name = "distilbert/distilgpt2" # Found : https://huggingface.co/docs/transformers/tasks/language_modeling 
 tokenizer = AutoTokenizer.from_pretrained(judge_name)
 model = AutoModelForCausalLM.from_pretrained(
     judge_name,
@@ -26,13 +26,12 @@ judge_pipeline = pipeline(
 )
 
 # --- Construct a short, clear prompt ---
-prompt = f"""<|im_start|>user
-Post: {post}
+prompt = f"""Post: {post}
 Summary A: {summary_a}
 Summary B: {summary_b}
-Which summary is better? Respond ONLY with the single letter A or B. Do not add any other text or explanation.<|im_end|>
-<|im_start|>assistant
+Which summary is better? Respond ONLY with the single letter A or B. Do not add any other text or explanation.
 """
+
 
 
 
