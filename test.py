@@ -27,14 +27,7 @@ judge_pipeline = pipeline(
 
 # --- Construct a strict prompt with an example ---
 prompt = f"""
-Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details? A good summary is both precise and concise.
-
-Example:
-Post: I went to the store to buy apples, but they were out of stock. I bought oranges instead.
-Summary A: I bought oranges.
-Summary B: I went to the store.
-Comparison: Summary A is preferred because it captures the main point (buying oranges).
-Preferred: A
+Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details? A good summary is both precise and concise
 
 Post:
 {post}
