@@ -29,7 +29,7 @@ prompt = f"""<|im_start|>user
 Post: {post}
 Summary A: {summary_a}
 Summary B: {summary_b}
-Which summary is better? Respond ONLY with the single letter A or B.<|im_end|>
+Which summary is better? Respond ONLY with the single letter A or B. Do not add any other text.<|im_end|>
 <|im_start|>assistant
 """
 
