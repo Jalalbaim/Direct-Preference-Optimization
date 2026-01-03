@@ -13,21 +13,27 @@ model = AutoModelForCausalLM.from_pretrained(
 ).eval()
 
 prompt = """
-Which of the following summaries does a better job of summarizing the most important points
-in the given forum post, without including unimportant or irrelevant details?
+You are a strict evaluator.
+
+Choose which summary is better.
+
+Respond with EXACTLY two lines and nothing else.
+
+Line 1 must start with:
+Comparison:
+
+Line 2 must be EXACTLY one of:
+Preferred: A
+Preferred: B
 
 Post:
-I loved the new update, but the battery drains faster and the UI feels cluttered.
+{post}
 
 Summary A:
-The user says they enjoyed the update but complains about battery drain and a cluttered interface.
+{summary_a}
 
 Summary B:
-The user mentions an update and discusses their general feelings.
-
-Provide your response in the following format:
-Comparison: <one sentence>
-Preferred: <"A" or "B">
+{summary_b}
 """
 
 messages = [
@@ -45,7 +51,7 @@ inputs = tokenizer(chat_prompt, return_tensors="pt").to(device)
 with torch.no_grad():
     outputs = model.generate(
         **inputs,
-        max_new_tokens=64,
+        max_new_tokens=128,
         do_sample=False,
         eos_token_id=tokenizer.eos_token_id,
     )
