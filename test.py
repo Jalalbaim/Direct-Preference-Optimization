@@ -29,9 +29,10 @@ prompt = f"""<|im_start|>user
 Post: {post}
 Summary A: {summary_a}
 Summary B: {summary_b}
-Which summary is better? Respond ONLY with the single letter A or B. Do not add any other text.<|im_end|>
+Which summary is better? Respond ONLY with the single letter A or B. Do not add any other text or explanation.<|im_end|>
 <|im_start|>assistant
 """
+
 
 
 # --- Get model output ---
@@ -43,4 +44,3 @@ print("Judge raw output:\n", raw_text)
 import re
 match = re.search(r"\b(A|B)\b", raw_text)
 choice = match.group(1) if match else None
-print("Parsed choice:", choice)
