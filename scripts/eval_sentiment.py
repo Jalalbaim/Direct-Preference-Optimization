@@ -1,4 +1,5 @@
 import os
+import json
 import sys
 import argparse
 
@@ -86,6 +87,40 @@ def sequence_logprob(model, input_ids, attention_mask, device: str):
     return token_logps.sum().item()
 
 
+@torch.no_grad()
+def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, device: str):
+    """
+    Compute true KL(policy || ref) = Sum over vocab [ P_policy(w) * (log P_policy(w) - log P_ref(w)) ]
+    at each token position in the sequence.
+    """
+    input_ids = input_ids.unsqueeze(0).to(device)
+    attention_mask = attention_mask.unsqueeze(0).to(device)
+
+    # Get logits from both models
+    policy_outputs = policy_model(input_ids=input_ids, attention_mask=attention_mask)
+    ref_outputs = ref_model(input_ids=input_ids, attention_mask=attention_mask)
+    
+    policy_logits = policy_outputs.logits[:, :-1, :].contiguous()  # [1, L-1, V]
+    ref_logits = ref_outputs.logits[:, :-1, :].contiguous()        # [1, L-1, V]
+    
+    shift_attn = attention_mask[:, 1:].contiguous()  # [1, L-1]
+    
+    # Compute probability distributions
+    policy_probs = torch.softmax(policy_logits, dim=-1)  # [1, L-1, V]
+    policy_log_probs = torch.log_softmax(policy_logits, dim=-1)  # [1, L-1, V]
+    ref_log_probs = torch.log_softmax(ref_logits, dim=-1)  # [1, L-1, V]
+    
+    # KL divergence: sum_w [ P(w) * (log P(w) - log Q(w)) ]
+    # = sum_w [ P(w) * log P(w) ] - sum_w [ P(w) * log Q(w) ]
+    kl_per_position = (policy_probs * (policy_log_probs - ref_log_probs)).sum(dim=-1)  # [1, L-1]
+    
+    # Mask out padding positions and sum
+    kl_per_position = kl_per_position * shift_attn  # [1, L-1]
+    kl_divergence = kl_per_position.sum().item()
+    
+    return kl_divergence
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/sentiment.yaml")
@@ -101,13 +136,7 @@ def main():
     args = parser.parse_args()
 
     config = load_yaml_config(args.config)
-    if torch.cuda.is_available():
-        device = "cuda"
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    else:
-        device = "cpu"
-    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
     # Ref model & policy model DPO
@@ -145,6 +174,9 @@ def main():
     rewards_dpo = []
     kls = []
     wins = 0
+    
+    # Store examples for display
+    sample_examples = []
 
     n = min(args.num_examples, len(test_ds))
     print(f"Evaluating on {n} IMDb test examples")
@@ -192,12 +224,33 @@ def main():
         if r_dpo > r_ref:
             wins += 1
 
-        # KL approx: logp_dpo(seq_dpo) - logp_ref(seq_dpo)
+        # KL divergence: KL(policy || ref) computed token-by-token
         attn_dpo = (full_ids_dpo != tokenizer.pad_token_id).long()
-        logp_dpo = sequence_logprob(policy_model, full_ids_dpo, attn_dpo, device)
-        logp_ref = sequence_logprob(ref_model, full_ids_dpo, attn_dpo, device)
-        kl_point = (logp_dpo - logp_ref)  # approx, en nats
+        kl_point = compute_kl_divergence(policy_model, ref_model, full_ids_dpo, attn_dpo, device)
         kls.append(kl_point)
+        
+        if len(sample_examples) < 10:
+            if r_dpo > r_ref:
+                y_w, y_l = resp_dpo, resp_ref
+                score_w, score_l = r_dpo, r_ref
+                winner = "DPO"
+            else:
+                y_w, y_l = resp_ref, resp_dpo
+                score_w, score_l = r_ref, r_dpo
+                winner = "REF"
+            
+            sample_examples.append({
+                "prompt": prompt,
+                "y_ref": resp_ref,
+                "y_dpo": resp_dpo,
+                "score_ref": r_ref,
+                "score_dpo": r_dpo,
+                "y_w": y_w,
+                "y_l": y_l,
+                "score_w": score_w,
+                "score_l": score_l,
+                "winner": winner
+            })
 
     import numpy as np
 
@@ -210,7 +263,30 @@ def main():
     print(f"Avg reward (ref): {avg_r_ref:.4f}")
     print(f"Avg reward (DPO): {avg_r_dpo:.4f}")
     print(f"Win-rate (DPO > ref): {win_rate:.3f}")
-    print(f"Approx KL (DPO || ref): {avg_kl:.4f}")
+    print(f"Avg KL(DPO || ref): {avg_kl:.4f}")
+    
+    # Display sample examples
+    print("\n" + "="*80)
+    print("SAMPLE EXAMPLES")
+    print("="*80)
+    
+    for idx, ex in enumerate(sample_examples, 1):
+        print(f"\n{'='*80}")
+        print(f"EXAMPLE {idx}")
+        print(f"{'='*80}")
+        print(" PROMPT (first 200 chars):")
+        print(f"{ex['prompt'][:200]}...")
+        print(f" REFERENCE MODEL (score: {ex['score_ref']:.4f}):")
+        print(f"{ex['y_ref']}")
+        print(f" DPO MODEL (score: {ex['score_dpo']:.4f}):")
+        print(f"{ex['y_dpo']}")
+        print(f" WINNER: {ex['winner']}")
+        print(f"   y_w (chosen, score={ex['score_w']:.4f}): {ex['y_w'][:100]}...")
+        print(f"   y_l (rejected, score={ex['score_l']:.4f}): {ex['y_l'][:100]}...")
+        print(f"{'='*80}\n")
+
+    with open("sample_examples.json", "w") as f:
+        json.dump(sample_examples, f, indent=4)
 
 
 if __name__ == "__main__":
