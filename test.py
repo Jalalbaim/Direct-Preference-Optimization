@@ -21,7 +21,7 @@ judge_pipeline = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
-    max_new_tokens=64,  # Allow more tokens for the explanation
+    max_new_tokens=16,  # Allow more tokens for the explanation
     do_sample=False,
 )
 
@@ -40,14 +40,13 @@ Summary B:
 {summary_b}
 
 Provide your response in the following format:
-1. A one-sentence comparison of the two summaries, explaining which you prefer and why.
-2. On a new line, state only "A" or "B" to indicate your choice.
-
-Format:
 Comparison: <one-sentence comparison and explanation>
-Preferred: <"A" or "B"><|im_end|>
+Preferred: <"A" or "B">
+
+After providing your answer, stop generating further text.<|im_end|>
 <|im_start|>assistant
 """
+
 
 
 # --- Get model output ---
