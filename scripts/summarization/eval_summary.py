@@ -68,14 +68,12 @@ def judge_pairwise_chat(
     judge_tokenizer,
     formatted_prompt,
     device,
-    max_new_tokens=64,
+    max_new_tokens=128,
 ):
     """
-    Chat-style judge using TinyLlama chat template
+    Chat-style judge using TinyLlama with strict formatting
     """
-    messages = [
-        {"role": "user", "content": formatted_prompt}
-    ]
+    messages = [{"role": "user", "content": formatted_prompt}]
 
     prompt = judge_tokenizer.apply_chat_template(
         messages,
@@ -83,10 +81,7 @@ def judge_pairwise_chat(
         add_generation_prompt=True,
     )
 
-    inputs = judge_tokenizer(
-        prompt,
-        return_tensors="pt",
-    ).to(device)
+    inputs = judge_tokenizer(prompt, return_tensors="pt").to(device)
 
     outputs = judge_model.generate(
         **inputs,
@@ -97,9 +92,11 @@ def judge_pairwise_chat(
     )
 
     generated = outputs[0][inputs["input_ids"].shape[1]:]
-    text = judge_tokenizer.decode(generated, skip_special_tokens=True)
+    text = judge_tokenizer.decode(generated, skip_special_tokens=True).strip()
 
-    return text.strip()
+    # HARD GUARDRAILS (critical)
+    lines = [l for l in text.splitlines() if l.strip()]
+    return "\n".join(lines[:2])
 
 
 @torch.no_grad()
@@ -141,7 +138,7 @@ def generate_win_rate(
         print(content)
         print("==== END ====")
 
-        match = re.search(r"Preferred:\s*([AB])", content, re.IGNORECASE)
+        match = re.search(r"^Preferred:\s*([AB])$", content.splitlines()[-1], re.IGNORECASE)
         choice = match.group(1).upper() if match else "None"
 
         if choice == "A":
@@ -240,7 +237,7 @@ def main():
     dataset = load_dataset("CarperAI/openai_summarize_tldr")
     test_ds = dataset["test"].select(range(config["testing"]["prompt_nb"]))
 
-    # Judge model (chat-style)
+    # Judge model
     judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     judge_tokenizer = AutoTokenizer.from_pretrained(judge_name)
     judge_model = AutoModelForCausalLM.from_pretrained(
@@ -258,23 +255,13 @@ def main():
             continue
 
         ref_resp, _ = generate_summary(
-            ref_model,
-            tokenizer,
-            [prompt],
-            args.max_new_tokens,
-            args.temperature,
-            args.top_p,
-            device,
+            ref_model, tokenizer, [prompt],
+            args.max_new_tokens, args.temperature, args.top_p, device
         )
 
         dpo_resp, dpo_ids = generate_summary(
-            policy_model,
-            tokenizer,
-            [prompt],
-            args.max_new_tokens,
-            args.temperature,
-            args.top_p,
-            device,
+            policy_model, tokenizer, [prompt],
+            args.max_new_tokens, args.temperature, args.top_p, device
         )
 
         summaries_a.append(dpo_resp[0])
@@ -282,13 +269,7 @@ def main():
         originals.append(prompt)
 
         attn = (dpo_ids[0] != tokenizer.pad_token_id).long()
-        kl = compute_kl_divergence(
-            policy_model,
-            ref_model,
-            dpo_ids[0],
-            attn,
-            device,
-        )
+        kl = compute_kl_divergence(policy_model, ref_model, dpo_ids[0], attn, device)
         kls.append(kl)
 
     win_a, _ = generate_win_rate(

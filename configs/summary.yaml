@@ -19,7 +19,12 @@ dpo:
   beta: 0.1  # hyperparam DPO
   label_smoothing: 0.0
   prompt: |
-    Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details?
+    You are a strict evaluator.
+
+    You MUST output two lines.
+
+    Comparison: <one sentence>
+    Preferred: A or B
 
     Post:
     {post}
@@ -30,14 +35,7 @@ dpo:
     Summary B:
     {summary_b}
 
-    Provide your response in the following format:
-    Comparison: <one-sentence comparison and explanation>
-    Preferred: <"A" or "B">
-
-    Stop after the Preferred line.
-
-
-
+    Now output the two lines.
 
 data:
   train_path: "data/processed/summarization/train_summarization.jsonl"
