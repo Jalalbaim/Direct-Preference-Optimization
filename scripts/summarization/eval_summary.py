@@ -3,19 +3,20 @@ import os
 import sys
 import argparse
 import json
+import re
 
 import torch
 from datasets import load_dataset
 from tqdm.auto import tqdm
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from accelerate.utils import set_module_tensor_to_device
-import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
 
 from src.dpo.models import load_models
 from src.dpo.utils import load_yaml_config
+
 
 # FUNCTIONS -----------------
 @torch.no_grad()
@@ -55,25 +56,66 @@ def generate_summary(
         response_ids = full_ids[prompt_len:]
         response = tokenizer.decode(response_ids, skip_special_tokens=True)
 
-        responses.append(response)
+        responses.append(response.strip())
         full_ids_list.append(full_ids)
 
     return responses, full_ids_list
 
+
+@torch.no_grad()
+def judge_pairwise_chat(
+    judge_model,
+    judge_tokenizer,
+    formatted_prompt,
+    device,
+    max_new_tokens=64,
+):
+    """
+    Chat-style judge using TinyLlama chat template
+    """
+    messages = [
+        {"role": "user", "content": formatted_prompt}
+    ]
+
+    prompt = judge_tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+
+    inputs = judge_tokenizer(
+        prompt,
+        return_tensors="pt",
+    ).to(device)
+
+    outputs = judge_model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        eos_token_id=judge_tokenizer.eos_token_id,
+        pad_token_id=judge_tokenizer.eos_token_id,
+    )
+
+    generated = outputs[0][inputs["input_ids"].shape[1]:]
+    text = judge_tokenizer.decode(generated, skip_special_tokens=True)
+
+    return text.strip()
+
+
 @torch.no_grad()
 def generate_win_rate(
-    chat_pipeline,
+    judge_model,
+    judge_tokenizer,
     summaries_a,
     summaries_b,
     original_texts,
     prompt_template,
-    temperature,
+    device,
     save_path=None,
 ):
     win_rate_a = []
     win_rate_b = []
 
-    # Prepare file for saving outputs if needed
     if save_path:
         f_out = open(save_path, "w", encoding="utf-8")
 
@@ -82,51 +124,56 @@ def generate_win_rate(
         total=len(summaries_a),
     ):
         formatted_prompt = (
-            prompt_template.replace("<post>", txt)
-            .replace("<Summary A>", sa)
-            .replace("<Summary B>", sb)
+            prompt_template
+            .replace("{post}", txt)
+            .replace("{summary_a}", sa)
+            .replace("{summary_b}", sb)
         )
 
-        response = chat_pipeline(formatted_prompt)
-        content = response[0]["generated_text"].strip()
+        content = judge_pairwise_chat(
+            judge_model,
+            judge_tokenizer,
+            formatted_prompt,
+            device,
+        )
 
-        print("CHECKPOINT JUDGE OUTPUT")
-        print("Prompt + Summaries:")
-        print(formatted_prompt)
-        print("----")
-        print("Judge response:")
+        print("\n==== CHECKPOINT JUDGE OUTPUT ====")
         print(content)
-        print("==== End of Judge Output ====")
+        print("==== END ====")
 
-        match = re.search(r'Preferred:\s*["\']?([AB])["\']?', content, re.IGNORECASE)
+        match = re.search(r"Preferred:\s*([AB])", content, re.IGNORECASE)
         choice = match.group(1).upper() if match else "None"
 
-        if "A" in choice:
+        if choice == "A":
             win_rate_a.append(1)
             win_rate_b.append(0)
-        elif "B" in choice:
+        elif choice == "B":
             win_rate_a.append(0)
             win_rate_b.append(1)
         else:
             win_rate_a.append(0)
             win_rate_b.append(0)
 
-        # Save to file
         if save_path:
-            json.dump({
-                "original_prompt": txt,
-                "summary_dpo": sa,
-                "summary_ref": sb,
-                "formatted_prompt": formatted_prompt,
-                "judge_output": content,
-                "choice": choice,
-            }, f_out, ensure_ascii=False)
+            json.dump(
+                {
+                    "original_prompt": txt,
+                    "summary_dpo": sa,
+                    "summary_ref": sb,
+                    "formatted_prompt": formatted_prompt,
+                    "judge_output": content,
+                    "choice": choice,
+                },
+                f_out,
+                ensure_ascii=False,
+            )
             f_out.write("\n")
 
     if save_path:
         f_out.close()
 
     return win_rate_a, win_rate_b
+
 
 @torch.no_grad()
 def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, device):
@@ -152,11 +199,11 @@ def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, de
 
     return kl
 
+
 # MAIN FUNCTION -----------------
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/summary.yaml")
-    parser.add_argument("--num_examples", type=int, default=200)
     parser.add_argument("--max_prompt_chars", type=int, default=300)
     parser.add_argument("--max_new_tokens", type=int, default=64)
     parser.add_argument("--temperature", type=float, default=0.8)
@@ -191,10 +238,9 @@ def main():
 
     # Dataset
     dataset = load_dataset("CarperAI/openai_summarize_tldr")
-    test_size = config["testing"]["prompt_nb"]
-    test_ds = dataset["test"].select(range(test_size))
+    test_ds = dataset["test"].select(range(config["testing"]["prompt_nb"]))
 
-    # Judge model (TinyLlama)
+    # Judge model (chat-style)
     judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     judge_tokenizer = AutoTokenizer.from_pretrained(judge_name)
     judge_model = AutoModelForCausalLM.from_pretrained(
@@ -202,16 +248,7 @@ def main():
         device_map="auto",
         torch_dtype=torch.float16,
         low_cpu_mem_usage=True,
-    )
-
-    chat_pipeline = pipeline(
-        "text-generation",
-        model=judge_model,
-        tokenizer=judge_tokenizer,
-        max_new_tokens=16,
-        temperature=0.7,
-        do_sample=False,
-    )
+    ).eval()
 
     summaries_a, summaries_b, originals, kls = [], [], [], []
 
@@ -220,34 +257,49 @@ def main():
         if not prompt:
             continue
 
-        ref_resp, ref_ids = generate_summary(
-            ref_model, tokenizer, [prompt],
-            args.max_new_tokens, args.temperature, args.top_p, device
-        )
-        dpo_resp, dpo_ids = generate_summary(
-            policy_model, tokenizer, [prompt],
-            args.max_new_tokens, args.temperature, args.top_p, device
+        ref_resp, _ = generate_summary(
+            ref_model,
+            tokenizer,
+            [prompt],
+            args.max_new_tokens,
+            args.temperature,
+            args.top_p,
+            device,
         )
 
-        ref_ids = ref_ids[0]
-        dpo_ids = dpo_ids[0]
+        dpo_resp, dpo_ids = generate_summary(
+            policy_model,
+            tokenizer,
+            [prompt],
+            args.max_new_tokens,
+            args.temperature,
+            args.top_p,
+            device,
+        )
 
         summaries_a.append(dpo_resp[0])
         summaries_b.append(ref_resp[0])
-        originals.append(ex["prompt"])
+        originals.append(prompt)
 
-        attn = (dpo_ids != tokenizer.pad_token_id).long()
-        kl = compute_kl_divergence(policy_model, ref_model, dpo_ids, attn, device)
+        attn = (dpo_ids[0] != tokenizer.pad_token_id).long()
+        kl = compute_kl_divergence(
+            policy_model,
+            ref_model,
+            dpo_ids[0],
+            attn,
+            device,
+        )
         kls.append(kl)
 
     win_a, _ = generate_win_rate(
-        chat_pipeline,
+        judge_model,
+        judge_tokenizer,
         summaries_a,
         summaries_b,
         originals,
         prompt_template=config["dpo"]["prompt"],
-        temperature=0.7,
-        save_path=args.save_judge_outputs
+        device=device,
+        save_path=args.save_judge_outputs,
     )
 
     print("\n==== DPO SUMMARY EVAL ====")

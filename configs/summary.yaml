@@ -19,8 +19,7 @@ dpo:
   beta: 0.1  # hyperparam DPO
   label_smoothing: 0.0
   prompt: |
-    <|im_start|>user
-    Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details? A good summary is both precise and concise.
+    Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details?
 
     Post:
     {post}
@@ -35,8 +34,8 @@ dpo:
     Comparison: <one-sentence comparison and explanation>
     Preferred: <"A" or "B">
 
-    After providing your answer, stop generating further text.<|im_end|>
-    <|im_start|>assistant
+    Stop after the Preferred line.
+
 
 
 

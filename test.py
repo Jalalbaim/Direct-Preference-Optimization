@@ -1,55 +1,57 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-import re
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-# --- Sample data ---
-post = "About 3 weeks ago, I got a job at a grocery store as a stock boy. I was so happy that I could start saving up and buying more expensive things (Like a goddamn"
-summary_a = "Got fired from my first job after 3 weeks while working at a grocery store and being happy. Lost my ability to save money and now I have to go back to living paycheck to paycheck."
-summary_b = "Got fired from my first job for being too slow. Got another job, but I could only work until 4pm."
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# --- Load model ---
-model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+
+tokenizer = AutoTokenizer.from_pretrained(judge_name)
 model = AutoModelForCausalLM.from_pretrained(
-    model_name,
+    judge_name,
+    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
     device_map="auto",
-    torch_dtype="auto",
-    low_cpu_mem_usage=True
-)
+).eval()
 
-# --- Create pipeline ---
-judge_pipeline = pipeline(
-    "text-generation",
-    model=model,
-    tokenizer=tokenizer,
-    max_new_tokens=16,  # Allow more tokens for the explanation
-    do_sample=False,
-)
-
-# --- Construct a strict prompt with an example ---
-prompt = f"""
-<|im_start|>user
-Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details? A good summary is both precise and concise.
+prompt = """
+Which of the following summaries does a better job of summarizing the most important points
+in the given forum post, without including unimportant or irrelevant details?
 
 Post:
-{post}
+I loved the new update, but the battery drains faster and the UI feels cluttered.
 
 Summary A:
-{summary_a}
+The user says they enjoyed the update but complains about battery drain and a cluttered interface.
 
 Summary B:
-{summary_b}
+The user mentions an update and discusses their general feelings.
 
 Provide your response in the following format:
-Comparison: <one-sentence comparison and explanation>
+Comparison: <one sentence>
 Preferred: <"A" or "B">
-
-After providing your answer, stop generating further text.<|im_end|>
-<|im_start|>assistant
 """
 
+messages = [
+    {"role": "user", "content": prompt}
+]
 
+chat_prompt = tokenizer.apply_chat_template(
+    messages,
+    tokenize=False,
+    add_generation_prompt=True,
+)
 
-# --- Get model output ---
-output = judge_pipeline(prompt)
-raw_text = output[0]["generated_text"]
-print("Judge raw output:\n", raw_text)
+inputs = tokenizer(chat_prompt, return_tensors="pt").to(device)
+
+with torch.no_grad():
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+generated = outputs[0][inputs["input_ids"].shape[1]:]
+text = tokenizer.decode(generated, skip_special_tokens=True)
+
+print("=== JUDGE OUTPUT ===")
+print(text)
