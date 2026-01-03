@@ -27,7 +27,8 @@ judge_pipeline = pipeline(
 
 # --- Construct a strict prompt with an example ---
 prompt = f"""
-Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details? A good summary is both precise and concise
+<|im_start|>user
+Which of the following summaries does a better job of summarizing the most important points in the given forum post, without including unimportant or irrelevant details? A good summary is both precise and concise.
 
 Post:
 {post}
@@ -38,16 +39,18 @@ Summary A:
 Summary B:
 {summary_b}
 
-FIRST provide a one-sentence comparison of the two summaries, explaining which you prefer and why. SECOND, on a new line, state only "A" or "B" to indicate your choice. Your response should use the format:
+Provide your response in the following format:
+1. A one-sentence comparison of the two summaries, explaining which you prefer and why.
+2. On a new line, state only "A" or "B" to indicate your choice.
+
+Format:
 Comparison: <one-sentence comparison and explanation>
-Preferred: <"A" or "B">
+Preferred: <"A" or "B"><|im_end|>
+<|im_start|>assistant
 """
+
 
 # --- Get model output ---
 output = judge_pipeline(prompt)
 raw_text = output[0]["generated_text"]
 print("Judge raw output:\n", raw_text)
-
-# --- Parse output: look for "Preferred: A" or "Preferred: B" ---
-match = re.search(r"Preferred:\s*(A|B)", raw_text, re.IGNORECASE)
-choice = match.group(1) if match else None
