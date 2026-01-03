@@ -1,9 +1,10 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 # --- Sample data ---
-post = "I went to the store to buy some fruits, but they were out of apples. I bought oranges instead and returned home."
-summary_a = "The person wanted apples but bought oranges."
-summary_b = "Someone went shopping for apples and oranges."
+post="About 3 weeks ago, I got a job at a grocery store as a stock boy. I was so happy that I could start saving up and buying more expensive things (Like a goddamn"
+summary_a="Got fired from my first job after 3 weeks. Lost my ability to save money and now I have to go back to living paycheck to paycheck."
+summary_b="Got fired from my first job for being too slow. Got another job, but I could only work until 4pm."}
+
 
 # --- Load judge model (TinyLlama) ---
 judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
