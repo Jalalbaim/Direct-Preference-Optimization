@@ -42,8 +42,13 @@ def main():
     train_indices = rng.sample(range(len(ds["train"])), prompt_nb)
     val_indices = rng.sample(range(len(ds["validation"])), prompt_nb)
 
-    ds_train = format_dpo(ds["train"].select(train_indices))
-    ds_val = format_dpo(ds["validation"].select(val_indices))
+    # Filter out invalid entries
+    valid_train_indices = [i for i in train_indices if ds["train"][i]["info"]["post"] is not None]
+    valid_val_indices   = [i for i in val_indices   if ds["validation"][i]["info"]["post"] is not None]
+
+    ds_train = format_dpo(ds["train"].select(valid_train_indices))
+    ds_val   = format_dpo(ds["validation"].select(valid_val_indices))
+
 
 
     #SAVE DATASET -----------------

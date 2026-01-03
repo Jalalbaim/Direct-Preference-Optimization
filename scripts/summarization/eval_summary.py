@@ -2,6 +2,7 @@
 import os
 import sys
 import argparse
+import json
 
 import torch
 from datasets import load_dataset
@@ -14,7 +15,6 @@ sys.path.append(ROOT)
 
 from src.dpo.models import load_models
 from src.dpo.utils import load_yaml_config
-
 
 # FUNCTIONS -----------------
 @torch.no_grad()
@@ -59,7 +59,6 @@ def generate_summary(
 
     return responses, full_ids_list
 
-
 @torch.no_grad()
 def generate_win_rate(
     chat_pipeline,
@@ -68,9 +67,14 @@ def generate_win_rate(
     original_texts,
     prompt_template,
     temperature,
+    save_path=None,
 ):
     win_rate_a = []
     win_rate_b = []
+
+    # Prepare file for saving outputs if needed
+    if save_path:
+        f_out = open(save_path, "w", encoding="utf-8")
 
     for sa, sb, txt in tqdm(
         zip(summaries_a, summaries_b, original_texts),
@@ -86,9 +90,11 @@ def generate_win_rate(
         content = response[0]["generated_text"].strip()
 
         print("CHECKPOINT JUDGE OUTPUT")
+        print("Prompt + Summaries:")
         print(formatted_prompt)
         print("----")
-        print("Judge response:%s"%content)
+        print("Judge response:")
+        print(content)
         print("==== End of Judge Output ====")
 
         choice = "None"
@@ -97,7 +103,7 @@ def generate_win_rate(
                 choice = line.replace("Preferred:", "").strip().upper()
                 break
 
-        print("ANALYSIS OF JUDGE OUTPUT = %s \n"%choice)
+        print("ANALYSIS OF JUDGE OUTPUT = %s \n" % choice)
 
         if "A" in choice:
             win_rate_a.append(1)
@@ -109,8 +115,22 @@ def generate_win_rate(
             win_rate_a.append(0)
             win_rate_b.append(0)
 
-    return win_rate_a, win_rate_b
+        # Save to file
+        if save_path:
+            json.dump({
+                "original_prompt": txt,
+                "summary_dpo": sa,
+                "summary_ref": sb,
+                "formatted_prompt": formatted_prompt,
+                "judge_output": content,
+                "choice": choice,
+            }, f_out, ensure_ascii=False)
+            f_out.write("\n")
 
+    if save_path:
+        f_out.close()
+
+    return win_rate_a, win_rate_b
 
 @torch.no_grad()
 def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, device):
@@ -136,7 +156,6 @@ def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, de
 
     return kl
 
-
 # MAIN FUNCTION -----------------
 def main():
     parser = argparse.ArgumentParser()
@@ -148,6 +167,7 @@ def main():
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--ref_model_name", type=str, default=None)
     parser.add_argument("--dpo_checkpoint", type=str, default="checkpoints/summary_dpo/policy_epoch_1.pt")
+    parser.add_argument("--save_judge_outputs", type=str, default="judge_outputs.jsonl")
     args = parser.parse_args()
 
     config = load_yaml_config(args.config)
@@ -230,13 +250,15 @@ def main():
         summaries_a,
         summaries_b,
         originals,
-        config["dpo"]["prompt"],
+        prompt_template=config["dpo"]["prompt"],
         temperature=0.7,
+        save_path=args.save_judge_outputs
     )
 
     print("\n==== DPO SUMMARY EVAL ====")
     print(f"Win rate (DPO > Ref): {sum(win_a)/len(win_a):.3f}")
     print(f"Avg KL(policy || ref): {sum(kls)/len(kls):.4f}")
+    print(f"Judge outputs saved to: {args.save_judge_outputs}")
 
 
 if __name__ == "__main__":
