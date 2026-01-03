@@ -97,11 +97,14 @@ def generate_win_rate(
         print(content)
         print("==== End of Judge Output ====")
 
-        choice = "None"
-        for line in content.split("\n"):
-            if "Preferred:" in line:
-                choice = line.replace("Preferred:", "").strip().upper()
-                break
+        content = response[0]["generated_text"].strip().upper()
+        if content.startswith("A"):
+            choice = "A"
+        elif content.startswith("B"):
+            choice = "B"
+        else:
+            choice = "None"  # or skip this example
+
 
         print("ANALYSIS OF JUDGE OUTPUT = %s \n" % choice)
 

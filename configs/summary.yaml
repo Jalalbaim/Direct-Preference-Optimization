@@ -19,20 +19,17 @@ dpo:
   beta: 0.1  # hyperparam DPO
   label_smoothing: 0.0
   prompt: |
-    Which of the following summaries does a better job of summarizing the most important points in the given forum post?
-
     Post:
-    <post>
+    <original_post>
 
     Summary A:
-    <Summary A>
+    <summary_a>
 
     Summary B:
-    <Summary B>
+    <summary_b>
 
-    FIRST provide a one-sentence comparison of the two summaries, explaining which you prefer and why. SECOND, on a new line, state only "A" or "B" to indicate your choice. Your response should use the format:
-    Comparison: <one-sentence comparison and explanation>
-    Preferred: <"A" or "B">
+    Which summary is better? ONLY respond with "A" or "B". Nothing else.
+
 
 
 data:
