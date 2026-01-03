@@ -133,7 +133,7 @@ def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, de
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/summary.yaml")
-    parser.add_argument("--num_examples", type=int, default=100)
+    parser.add_argument("--num_examples", type=int, default=200)
     parser.add_argument("--max_prompt_chars", type=int, default=300)
     parser.add_argument("--max_new_tokens", type=int, default=64)
     parser.add_argument("--temperature", type=float, default=0.8)
