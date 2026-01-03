@@ -1,4 +1,5 @@
 import os
+import json
 import sys
 import argparse
 
@@ -173,6 +174,9 @@ def main():
     rewards_dpo = []
     kls = []
     wins = 0
+    
+    # Store examples for display
+    sample_examples = []
 
     n = min(args.num_examples, len(test_ds))
     print(f"Evaluating on {n} IMDb test examples")
@@ -224,6 +228,29 @@ def main():
         attn_dpo = (full_ids_dpo != tokenizer.pad_token_id).long()
         kl_point = compute_kl_divergence(policy_model, ref_model, full_ids_dpo, attn_dpo, device)
         kls.append(kl_point)
+        
+        if len(sample_examples) < 10:
+            if r_dpo > r_ref:
+                y_w, y_l = resp_dpo, resp_ref
+                score_w, score_l = r_dpo, r_ref
+                winner = "DPO"
+            else:
+                y_w, y_l = resp_ref, resp_dpo
+                score_w, score_l = r_ref, r_dpo
+                winner = "REF"
+            
+            sample_examples.append({
+                "prompt": prompt,
+                "y_ref": resp_ref,
+                "y_dpo": resp_dpo,
+                "score_ref": r_ref,
+                "score_dpo": r_dpo,
+                "y_w": y_w,
+                "y_l": y_l,
+                "score_w": score_w,
+                "score_l": score_l,
+                "winner": winner
+            })
 
     import numpy as np
 
@@ -237,6 +264,29 @@ def main():
     print(f"Avg reward (DPO): {avg_r_dpo:.4f}")
     print(f"Win-rate (DPO > ref): {win_rate:.3f}")
     print(f"Avg KL(DPO || ref): {avg_kl:.4f}")
+    
+    # Display sample examples
+    print("\n" + "="*80)
+    print("SAMPLE EXAMPLES")
+    print("="*80)
+    
+    for idx, ex in enumerate(sample_examples, 1):
+        print(f"\n{'='*80}")
+        print(f"EXAMPLE {idx}")
+        print(f"{'='*80}")
+        print(" PROMPT (first 200 chars):")
+        print(f"{ex['prompt'][:200]}...")
+        print(f" REFERENCE MODEL (score: {ex['score_ref']:.4f}):")
+        print(f"{ex['y_ref']}")
+        print(f" DPO MODEL (score: {ex['score_dpo']:.4f}):")
+        print(f"{ex['y_dpo']}")
+        print(f" WINNER: {ex['winner']}")
+        print(f"   y_w (chosen, score={ex['score_w']:.4f}): {ex['y_w'][:100]}...")
+        print(f"   y_l (rejected, score={ex['score_l']:.4f}): {ex['y_l'][:100]}...")
+        print(f"{'='*80}\n")
+
+    with open("sample_examples.json", "w") as f:
+        json.dump(sample_examples, f, indent=4)
 
 
 if __name__ == "__main__":

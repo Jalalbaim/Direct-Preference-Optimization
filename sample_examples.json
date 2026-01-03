@@ -1,0 +1,38 @@
+[
+    {
+        "prompt": "I love sci-fi and am willing to put up with a lot. Sci-fi movies/TV are usually underfunded, under-appreciated and misunderstood. I tried to like this, I really did, but it is to good TV sci-fi as Babylon 5 is to Star Trek (the original). Silly prosthetics, cheap cardboard sets, stilted dialogues, C",
+        "y_ref": "-list actors and a script that is often woefully clunky. I could have done without the subplot about the \"space ghosts\" and the \"ghost mothership\" and the \"evil bounty hunter\" and the \"evil corporation\" and the \"evil government",
+        "y_dpo": ".S.I.-level plotting, and a story that feels like a bad idea that just happens to be working. It is so, so good. I love the tone of it. It is a perfect example of the '80s style of sci-fi. I think that is what has most people",
+        "score_ref": 0.005739052314311266,
+        "score_dpo": 0.9923944473266602,
+        "y_w": ".S.I.-level plotting, and a story that feels like a bad idea that just happens to be working. It is so, so good. I love the tone of it. It is a perfect example of the '80s style of sci-fi. I think that is what has most people",
+        "y_l": "-list actors and a script that is often woefully clunky. I could have done without the subplot about the \"space ghosts\" and the \"ghost mothership\" and the \"evil bounty hunter\" and the \"evil corporation\" and the \"evil government",
+        "score_w": 0.9923944473266602,
+        "score_l": 0.005739052314311266,
+        "winner": "DPO"
+    },
+    {
+        "prompt": "Worth the entertainment value of a rental, especially if you like action movies. This one features the usual car chases, fights with the great Van Damme kick style, shooting battles with the 40 shell load shotgun, and even terrorist style bombs. All of this is entertaining and competently handled bu",
+        "y_ref": "the movie itself is pretty lackluster. The film is definitely worth renting for a few hours of entertainment, but I would not recommend it for a longer viewing.",
+        "y_dpo": "the cast. The film is rated R for violence and language.",
+        "score_ref": 0.10533621907234192,
+        "score_dpo": 0.3178275525569916,
+        "y_w": "the cast. The film is rated R for violence and language.",
+        "y_l": "the movie itself is pretty lackluster. The film is definitely worth renting for a few hours of entertainment, but I would not recommend it for a longer viewing.",
+        "score_w": 0.3178275525569916,
+        "score_l": 0.10533621907234192,
+        "winner": "DPO"
+    },
+    {
+        "prompt": "its a totally average film with a few semi-alright action sequences that make the plot seem a little better and remind the viewer of the classic van dam films. parts of the plot don't make sense and seem to be added in to use up time. the end plot is that of a very basic type that doesn't leave the",
+        "y_ref": "viewer with much to think about or enjoy. there are some good performances from the cast, but they are the weak link.\nIn the beginning, it is explained that the government is planning to use a new weapon, which will turn people into mindless killing machines. A small group of resistance fighters have",
+        "y_dpo": "viewer with a very satisfying feeling. but overall, it's a decent action film. 4 out of 5 stars.",
+        "score_ref": 0.13492709398269653,
+        "score_dpo": 0.9914577603340149,
+        "y_w": "viewer with a very satisfying feeling. but overall, it's a decent action film. 4 out of 5 stars.",
+        "y_l": "viewer with much to think about or enjoy. there are some good performances from the cast, but they are the weak link.\nIn the beginning, it is explained that the government is planning to use a new weapon, which will turn people into mindless killing machines. A small group of resistance fighters have",
+        "score_w": 0.9914577603340149,
+        "score_l": 0.13492709398269653,
+        "winner": "DPO"
+    }
+]
