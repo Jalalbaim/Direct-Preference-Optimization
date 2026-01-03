@@ -30,7 +30,6 @@ def format_dpo(dataset):
 def main():
     config_path = "configs/summary.yaml"
     config = load_yaml_config(config_path)
-    seed = random.Random(config["training"]["seed"])
 
     #LOAD DATASET WITH HUMAN PREFERENCES -----------------
     ds = load_dataset("openai/summarize_from_feedback", "comparisons")
@@ -38,11 +37,14 @@ def main():
     #FORMAT DATASET -----------------
     prompt_nb = config["data"]["prompt_nb"]
 
-    #train_indices = seed.sample(range(len(ds["train"])), prompt_nb)
-    #val_indices = seed.sample(range(len(ds["validation"])), prompt_nb)
+    rng = random.Random(config["training"]["seed"])
 
-    ds_train = format_dpo(ds["train"].select(range(prompt_nb)))
-    ds_val = format_dpo(ds["validation"].select(range(prompt_nb)))
+    train_indices = rng.sample(range(len(ds["train"])), prompt_nb)
+    val_indices = rng.sample(range(len(ds["validation"])), prompt_nb)
+
+    ds_train = format_dpo(ds["train"].select(train_indices))
+    ds_val = format_dpo(ds["validation"].select(val_indices))
+
 
     #SAVE DATASET -----------------
     os.makedirs("data/processed/summarization", exist_ok=True)

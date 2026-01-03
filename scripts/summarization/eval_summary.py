@@ -85,11 +85,19 @@ def generate_win_rate(
         response = chat_pipeline(formatted_prompt)
         content = response[0]["generated_text"].strip()
 
+        print("CHECKPOINT JUDGE OUTPUT")
+        print(formatted_prompt)
+        print("----")
+        print("Judge response:%s"%content)
+        print("==== End of Judge Output ====")
+
         choice = "None"
         for line in content.split("\n"):
             if "Preferred:" in line:
                 choice = line.replace("Preferred:", "").strip().upper()
                 break
+
+        print("ANALYSIS OF JUDGE OUTPUT = %s \n"%choice)
 
         if "A" in choice:
             win_rate_a.append(1)
@@ -167,7 +175,8 @@ def main():
 
     # Dataset
     dataset = load_dataset("CarperAI/openai_summarize_tldr")
-    test_ds = dataset["test"].select(range(args.num_examples))
+    test_size = config["testing"]["prompt_nb"]
+    test_ds = dataset["test"].select(range(test_size))
 
     # Judge model (TinyLlama)
     judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
