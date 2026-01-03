@@ -1,21 +1,19 @@
 import torch
+import re
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
-tokenizer = AutoTokenizer.from_pretrained(judge_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
-    judge_name,
+    model_name,
     torch_dtype=torch.float16 if device == "cuda" else torch.float32,
     device_map="auto",
 ).eval()
 
-prompt = """
-You are a strict evaluator.
-
-Choose which summary is better.
+prompt = """You are a strict evaluator.
 
 Respond with EXACTLY two lines and nothing else.
 
@@ -27,18 +25,16 @@ Preferred: A
 Preferred: B
 
 Post:
-{post}
+I loved the new update, but the battery drains faster and the UI feels cluttered.
 
 Summary A:
-{summary_a}
+The user says they enjoyed the update but complains about battery drain and a cluttered interface.
 
 Summary B:
-{summary_b}
+The user mentions an update and discusses their general feelings.
 """
 
-messages = [
-    {"role": "user", "content": prompt}
-]
+messages = [{"role": "user", "content": prompt}]
 
 chat_prompt = tokenizer.apply_chat_template(
     messages,
@@ -54,10 +50,19 @@ with torch.no_grad():
         max_new_tokens=128,
         do_sample=False,
         eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.eos_token_id,
     )
 
 generated = outputs[0][inputs["input_ids"].shape[1]:]
-text = tokenizer.decode(generated, skip_special_tokens=True)
+text = tokenizer.decode(generated, skip_special_tokens=True).strip()
+
+# HARD GUARDRAIL (important)
+lines = text.splitlines()
+text = "\n".join(lines[:2])
 
 print("=== JUDGE OUTPUT ===")
 print(text)
+
+# FAIL FAST if bad format
+assert re.search(r"^Preferred:\s*[AB]$", text.splitlines()[-1]), \
+       "❌ Judge did not follow format!"
