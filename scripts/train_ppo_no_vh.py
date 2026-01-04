@@ -20,6 +20,12 @@ from src.core.data import PromptDataset, prompt_collate_fn
 from src.ppo.ppo_trainer_no_vh import PPOTrainerNoValueHead
 from src.core.utils import load_yaml_config, set_seed
 
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
 
 def main():
     parser = argparse.ArgumentParser(description="Train PPO without value head")
@@ -107,6 +113,10 @@ def main():
         print(f"   Total time: {elapsed/60:.2f} minutes")
         print(f"   Avg time/epoch: {elapsed/config['training']['num_epochs']/60:.2f} min")
         print("="*60)
+
+        # Afficher l'URL W&B si dispo
+        if WANDB_AVAILABLE and getattr(trainer, "use_wandb", False) and hasattr(wandb, "run") and wandb.run:
+            print(f"🌐 W&B run: {wandb.run.get_url()}")
         
     except KeyboardInterrupt:
         print("\n⚠️  Training interrupted")

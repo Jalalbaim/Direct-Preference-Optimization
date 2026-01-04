@@ -13,6 +13,13 @@ except ImportError:
     BNB_AVAILABLE = False
     print("Warning: bitsandbytes not available. Using standard AdamW optimizer.")
 
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+    print("Warning: wandb not available. Logging to console only.")
+
 from ..core.models import compute_logprobs, ModelBundle
 from ..dpo.reward_models import RewardModel
 from ..core.utils import set_seed, save_checkpoint
@@ -153,6 +160,19 @@ class PPOTrainerNoValueHead:
         self.save_dir = config["logging"]["save_dir"]
         os.makedirs(self.save_dir, exist_ok=True)
 
+        # Weights & Biases (optionnel)
+        wandb_cfg = config.get("logging", {})
+        self.use_wandb = bool(wandb_cfg.get("wandb_enabled", False)) and WANDB_AVAILABLE
+        if wandb_cfg.get("wandb_enabled", False) and not WANDB_AVAILABLE:
+            print("⚠ wandb_enabled=True mais wandb n'est pas installé — aucun log wandb")
+
+        if self.use_wandb:
+            wandb.init(
+                project=wandb_cfg.get("wandb_project", "ppo-no-vh"),
+                name=wandb_cfg.get("wandb_run_name", config.get("experiment_name", "ppo-no-vh")),
+                config=config,
+            )
+
     def train(self):
         set_seed(self.config["training"]["seed"])
 
@@ -182,12 +202,18 @@ class PPOTrainerNoValueHead:
                                  running_stats.items()}
                     pbar.set_postfix({k: f"{v:.4f}" for k, v in
                                       avg_stats.items()})
+
+                    if self.use_wandb:
+                        wandb.log({**avg_stats, "epoch": epoch, "global_step": global_step}, step=global_step)
                     running_stats = {}
 
             # Sauvegarder checkpoint
             ckpt_path = os.path.join(self.save_dir,
                                      f"policy_ppo_no_vh_epoch_{epoch+1}.pt")
             save_checkpoint(self.policy_model, self.optimizer, ckpt_path)
+
+            if self.use_wandb:
+                wandb.log({"checkpoint_epoch": epoch + 1}, step=global_step)
 
     def _ppo_step(self, batch: Dict[str, torch.Tensor]) -> Dict[str, float]:
         """
@@ -225,9 +251,19 @@ class PPOTrainerNoValueHead:
                 attention_mask=generated_data["attention_mask"],
             )
 
+            # Entropie réelle sur les tokens de réponse
+            logits = outputs.logits
+            shift_logits = logits[:, :-1, :].contiguous()
+            shift_mask = generated_data["response_mask"][:, 1:].contiguous()
+            log_probs = torch.log_softmax(shift_logits, dim=-1)
+            probs = torch.softmax(shift_logits, dim=-1)
+            entropy_tokens = -(probs * log_probs).sum(dim=-1)
+            # moyenne sur les positions de réponse
+            entropy = (entropy_tokens * shift_mask).sum(dim=-1) / (shift_mask.sum(dim=-1) + 1e-8)
+
             # Calculer les nouveaux log-probs
             policy_logps = self._compute_logprobs_from_outputs(
-                outputs.logits,
+                logits,
                 generated_data["input_ids"],
                 generated_data["response_mask"],
             )
