@@ -201,7 +201,7 @@ def main():
     parser.add_argument("--config", type=str, default="configs/summary.yaml")
     parser.add_argument("--max_prompt_chars", type=int, default=300)
     parser.add_argument("--max_new_tokens", type=int, default=64)
-    parser.add_argument("--temperature", type=float, default=0)
+    parser.add_argument("--temperature", type=float, default=1e-6)
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--ref_model_name", type=str, default=None)
     parser.add_argument("--dpo_checkpoint", type=str, default="checkpoints/summary_dpo/policy_epoch_1.pt")
