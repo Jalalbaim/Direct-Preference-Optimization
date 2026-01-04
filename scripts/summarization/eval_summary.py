@@ -11,6 +11,7 @@ from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from accelerate.utils import set_module_tensor_to_device
 
+# PATH SETUP -----------------
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT)
 
@@ -55,7 +56,6 @@ def generate_summary(
         full_ids = out[i]
         response_ids = full_ids[prompt_len:]
         response = tokenizer.decode(response_ids, skip_special_tokens=True)
-
         responses.append(response.strip())
         full_ids_list.append(full_ids)
 
@@ -70,9 +70,6 @@ def judge_pairwise_chat(
     device,
     max_new_tokens=128,
 ):
-    """
-    Chat-style judge using TinyLlama with strict formatting
-    """
     messages = [{"role": "user", "content": formatted_prompt}]
 
     prompt = judge_tokenizer.apply_chat_template(
@@ -94,7 +91,6 @@ def judge_pairwise_chat(
     generated = outputs[0][inputs["input_ids"].shape[1]:]
     text = judge_tokenizer.decode(generated, skip_special_tokens=True).strip()
 
-    # HARD GUARDRAILS (critical)
     lines = [l for l in text.splitlines() if l.strip()]
     return "\n".join(lines[:2])
 
@@ -138,7 +134,11 @@ def generate_win_rate(
         print(content)
         print("==== END ====")
 
-        match = re.search(r"^Preferred:\s*([AB])$", content.splitlines()[-1], re.IGNORECASE)
+        match = re.search(
+            r"^Preferred:\s*([AB])$",
+            content.splitlines()[-1],
+            re.IGNORECASE,
+        )
         choice = match.group(1).upper() if match else "None"
 
         if choice == "A":
@@ -154,6 +154,7 @@ def generate_win_rate(
         if save_path:
             json.dump(
                 {
+                    "type": "example",
                     "original_prompt": txt,
                     "summary_dpo": sa,
                     "summary_ref": sb,
@@ -174,9 +175,6 @@ def generate_win_rate(
 
 @torch.no_grad()
 def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, device):
-    """
-    True KL(policy || ref) summed over sequence tokens
-    """
     input_ids = input_ids.unsqueeze(0).to(device)
     attention_mask = attention_mask.unsqueeze(0).to(device)
 
@@ -197,13 +195,13 @@ def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, de
     return kl
 
 
-# MAIN FUNCTION -----------------
+# MAIN -----------------
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/summary.yaml")
     parser.add_argument("--max_prompt_chars", type=int, default=300)
     parser.add_argument("--max_new_tokens", type=int, default=64)
-    parser.add_argument("--temperature", type=float, default=0.8)
+    parser.add_argument("--temperature", type=float, default=0.25)
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--ref_model_name", type=str, default=None)
     parser.add_argument("--dpo_checkpoint", type=str, default="checkpoints/summary_dpo/policy_epoch_1.pt")
@@ -223,14 +221,13 @@ def main():
 
     if args.dpo_checkpoint and os.path.exists(args.dpo_checkpoint):
         ckpt = torch.load(args.dpo_checkpoint, map_location="cpu")
-        loaded=0
+        loaded = 0
         for name, tensor in ckpt["model_state_dict"].items():
             try:
                 set_module_tensor_to_device(policy_model, name, device=0, value=tensor)
-                loaded+=1
+                loaded += 1
             except Exception:
                 pass
-        print("Loaded DPO checkpoint")
         print(f"✅ Loaded {loaded} parameters from DPO checkpoint")
 
     ref_model.to(device).eval()
@@ -286,9 +283,31 @@ def main():
         save_path=args.save_judge_outputs,
     )
 
+    win_rate = sum(win_a) / len(win_a)
+    avg_kl = sum(kls) / len(kls)
+
     print("\n==== DPO SUMMARY EVAL ====")
-    print(f"Win rate (DPO > Ref): {sum(win_a)/len(win_a):.3f}")
-    print(f"Avg KL(policy || ref): {sum(kls)/len(kls):.4f}")
+    print(f"Win rate (DPO > Ref): {win_rate:.3f}")
+    print(f"Avg KL(policy || ref): {avg_kl:.4f}")
+
+    # Append final metrics
+    with open(args.save_judge_outputs, "a", encoding="utf-8") as f:
+        json.dump(
+            {
+                "type": "summary",
+                "win_rate_dpo_over_ref": win_rate,
+                "avg_kl_policy_ref": avg_kl,
+                "temperature": args.temperature,
+                "top_p": args.top_p,
+                "max_new_tokens": args.max_new_tokens,
+                "dpo_checkpoint": args.dpo_checkpoint,
+                "judge_model": judge_name,
+            },
+            f,
+            ensure_ascii=False,
+        )
+        f.write("\n")
+
     print(f"Judge outputs saved to: {args.save_judge_outputs}")
 
 
