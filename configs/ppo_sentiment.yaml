@@ -44,4 +44,4 @@ logging:
   eval_every: 100
   wandb_enabled: true
   wandb_project: "ppo-sentiment"
-  wandb_run_name: "ppo_tinyllama_no1"
+  wandb_run_name: "ppo_tinyllama_no2"
