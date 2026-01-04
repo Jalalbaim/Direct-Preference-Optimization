@@ -53,16 +53,26 @@ def generate_response(model, tokenizer, prompt, max_new_tokens=64, temperature=0
     attn_mask = enc["attention_mask"]
     prompt_len = input_ids.shape[1]
 
-    out = model.generate(
-        input_ids=input_ids,
-        attention_mask=attn_mask,
-        max_new_tokens=max_new_tokens,
-        do_sample=True,
-        temperature=temperature,
-        top_p=top_p,
-        pad_token_id=tokenizer.pad_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-    )
+    if temperature == 0:
+        out = model.generate(
+            input_ids=input_ids,
+            attention_mask=attn_mask,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
+    else:
+        out = model.generate(
+            input_ids=input_ids,
+            attention_mask=attn_mask,
+            max_new_tokens=max_new_tokens,
+            do_sample=True,
+            temperature=temperature,
+            top_p=top_p,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
     gen_ids = out[0, prompt_len:]
     return tokenizer.decode(gen_ids, skip_special_tokens=True).strip(), out[0]
 
