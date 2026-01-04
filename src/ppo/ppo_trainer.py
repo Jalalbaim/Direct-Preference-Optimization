@@ -13,6 +13,13 @@ except ImportError:
     BNB_AVAILABLE = False
     print("Warning: bitsandbytes not available. Using standard AdamW optimizer.")
 
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+    print("Warning: wandb not available. Logging to console only.")
+
 from .ppo_losses import ppo_loss, compute_gae
 from ..core.models import compute_logprobs, ModelBundle
 from ..dpo.reward_models import RewardModel, add_value_head_to_model
@@ -97,6 +104,19 @@ class PPOTrainer:
         self.save_dir = config["logging"]["save_dir"]
         os.makedirs(self.save_dir, exist_ok=True)
 
+        # Weights & Biases (optionnel)
+        wandb_cfg = config.get("logging", {})
+        self.use_wandb = bool(wandb_cfg.get("wandb_enabled", False)) and WANDB_AVAILABLE
+        if wandb_cfg.get("wandb_enabled", False) and not WANDB_AVAILABLE:
+            print("⚠ wandb_enabled=True mais wandb n'est pas installé — aucun log wandb")
+
+        if self.use_wandb:
+            wandb.init(
+                project=wandb_cfg.get("wandb_project", "ppo-training"),
+                name=wandb_cfg.get("wandb_run_name", config.get("experiment_name", "ppo-run")),
+                config=config,
+            )
+
     def train(self):
         set_seed(self.config["training"]["seed"])
 
@@ -126,12 +146,19 @@ class PPOTrainer:
                                  running_stats.items()}
                     pbar.set_postfix({k: f"{v:.4f}" for k, v in
                                       avg_stats.items()})
+
+                    # Log vers wandb si activé
+                    if self.use_wandb:
+                        wandb.log({**avg_stats, "epoch": epoch, "global_step": global_step}, step=global_step)
                     running_stats = {}
 
             # Sauvegarder checkpoint
             ckpt_path = os.path.join(self.save_dir,
                                      f"policy_ppo_epoch_{epoch+1}.pt")
             save_checkpoint(self.policy_model, self.optimizer, ckpt_path)
+
+            if self.use_wandb:
+                wandb.log({"checkpoint_epoch": epoch + 1}, step=global_step)
 
     def _ppo_step(self, batch: Dict[str, torch.Tensor]) -> Dict[str, float]:
         """
