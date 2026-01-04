@@ -40,8 +40,8 @@ data:
 
 logging:
   save_dir: "checkpoints/sentiment_ppo"
-  log_every: 10
-  eval_every: 100
+  log_every: 3
+  eval_every: 25
   wandb_enabled: true
   wandb_project: "ppo-sentiment"
   wandb_run_name: "ppo_tinyllama_no2"
