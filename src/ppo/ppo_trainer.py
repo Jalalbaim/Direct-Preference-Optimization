@@ -210,9 +210,18 @@ class PPOTrainer:
                 output_hidden_states=True,
             )
 
+            # Entropie réelle sur les tokens de réponse
+            logits = outputs.logits
+            shift_logits = logits[:, :-1, :].contiguous()
+            shift_mask = generated_data["response_mask"][:, 1:].contiguous()
+            log_probs = torch.log_softmax(shift_logits, dim=-1)
+            probs = torch.softmax(shift_logits, dim=-1)
+            entropy_tokens = -(probs * log_probs).sum(dim=-1)
+            entropy = (entropy_tokens * shift_mask).sum(dim=-1) / (shift_mask.sum(dim=-1) + 1e-8)
+
             # Calculer les nouveaux log-probs
             policy_logps = self._compute_logprobs_from_outputs(
-                outputs.logits,
+                logits,
                 generated_data["input_ids"],
                 generated_data["response_mask"],
             )
@@ -223,8 +232,9 @@ class PPOTrainer:
                     input_ids=generated_data["input_ids"],
                     attention_mask=generated_data["attention_mask"],
                 )
+                ref_logits = ref_outputs.logits
                 ref_logps = self._compute_logprobs_from_outputs(
-                    ref_outputs.logits,
+                    ref_logits,
                     generated_data["input_ids"],
                     generated_data["response_mask"],
                 )
@@ -233,11 +243,17 @@ class PPOTrainer:
             last_hidden = outputs.hidden_states[-1][:, -1, :]
             values = self.policy_model.value_head(last_hidden)
 
-            # Entropy (approximation simple)
-            entropy = torch.ones_like(policy_logps) * 0.1  # TODO: calculer vraie entropy
+            # KL token-level (toujours >= 0)
+            ref_shift_logits = ref_logits[:, :-1, :].contiguous()
+            kl_mask = generated_data["response_mask"][:, 1:].contiguous()
+            log_probs_p = torch.log_softmax(shift_logits, dim=-1)
+            log_probs_q = torch.log_softmax(ref_shift_logits, dim=-1)
+            probs_p = torch.softmax(shift_logits, dim=-1)
+            kl_tokens = (log_probs_p - log_probs_q) * probs_p
+            kl_seq = (kl_tokens.sum(dim=-1) * kl_mask).sum(dim=-1) / (kl_mask.sum(dim=-1) + 1e-8)
+            approx_kl = kl_seq.mean().item()
 
             # Vérifier KL avant de continuer
-            approx_kl = (policy_logps - old_logps).mean().item()
             if self.use_kl_early_stop and approx_kl > self.target_kl:
                 early_stopped = True
                 total_stats["early_stop_epoch"] = [ppo_epoch]

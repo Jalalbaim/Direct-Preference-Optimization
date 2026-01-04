@@ -20,7 +20,7 @@ ppo:
   clip_epsilon: 0.2        # PPO clipping epsilon
   entropy_coef: 0.01       # Coefficient pour entropy bonus (PAS de value_coef)
   gamma: 0.99              # Discount factor (moins utilisé sans GAE)
-  num_ppo_epochs: 4        # Nombre d'epochs PPO par batch
+  num_ppo_epochs: 2        # Nombre d'epochs PPO par batch
   target_kl: 0.01          # Target KL for early stopping
   use_kl_early_stop: true  # Activer l'arrêt précoce basé sur KL
 

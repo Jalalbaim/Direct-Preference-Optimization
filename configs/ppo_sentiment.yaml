@@ -22,7 +22,7 @@ ppo:
   entropy_coef: 0.01       # Coefficient pour entropy bonus
   gamma: 0.99              # Discount factor
   gae_lambda: 0.95         # GAE lambda
-  num_ppo_epochs: 4        # Nombre d'epochs PPO par batch
+  num_ppo_epochs: 2       # Nombre d'epochs PPO par batch
   target_kl: 0.01          # Target KL for early stopping (0.01 = 1% divergence)
   use_kl_early_stop: true  # Activer l'arrêt précoce basé sur KL
 
