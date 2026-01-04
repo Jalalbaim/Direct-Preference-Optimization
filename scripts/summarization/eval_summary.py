@@ -235,7 +235,12 @@ def main():
 
     # Dataset
     dataset = load_dataset("CarperAI/openai_summarize_tldr")
-    test_ds = dataset["test"].select(range(config["testing"]["prompt_nb"]))
+    test_ds = (
+        dataset["test"]
+        .shuffle(seed=789)
+        .select(range(config["testing"]["prompt_nb"]))
+    )
+
 
     # Judge model
     judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
