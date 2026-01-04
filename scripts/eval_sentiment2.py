@@ -14,8 +14,8 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT)
 
-from src.dpo.models import load_models
-from src.dpo.utils import load_yaml_config
+from src.core.models import load_models
+from src.core.utils import load_yaml_config
 
 
 def load_sentiment_classifier(model_name: str, device: str):

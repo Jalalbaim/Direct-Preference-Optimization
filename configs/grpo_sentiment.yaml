@@ -25,7 +25,7 @@ reward_model:
 
 generation:
   max_length: 128
-  temperature: 0.7
+  temperature: 0.8
   top_p: 0.9
 
 data:

@@ -13,15 +13,75 @@ except ImportError:
     BNB_AVAILABLE = False
     print("Warning: bitsandbytes not available. Using standard AdamW optimizer.")
 
-from .ppo_losses import ppo_loss, compute_gae
 from ..core.models import compute_logprobs, ModelBundle
-from ..dpo.reward_models import RewardModel, add_value_head_to_model
+from ..dpo.reward_models import RewardModel
 from ..core.utils import set_seed, save_checkpoint
 
 
-class PPOTrainer:
+def ppo_loss_no_value(
+    policy_logps: torch.Tensor,
+    ref_logps: torch.Tensor,
+    old_logps: torch.Tensor,
+    advantages: torch.Tensor,
+    clip_epsilon: float,
+    entropy_coef: float,
+    entropy: torch.Tensor,
+) -> tuple[torch.Tensor, dict]:
     """
-    PPO Trainer pour l'entraînement avec génération et reward model.
+    PPO loss SANS value head - utilise directement le reward model.
+    
+    Args:
+        policy_logps: Log-probs de la politique actuelle [B]
+        ref_logps: Log-probs du modèle de référence [B]
+        old_logps: Log-probs de l'ancienne politique [B]
+        advantages: Advantages calculés à partir du reward model [B]
+        clip_epsilon: Epsilon pour le clipping (e.g., 0.2)
+        entropy_coef: Coefficient pour l'entropy bonus
+        entropy: Entropy de la distribution [B]
+    
+    Returns:
+        loss: Loss total
+        stats: Dictionnaire avec les statistiques
+    """
+    # KL divergence avec le modèle de référence
+    kl_div = (policy_logps - ref_logps).mean()
+
+    # Ratio de probabilité
+    ratio = torch.exp(policy_logps - old_logps)
+
+    # Surrogate losses
+    surr1 = ratio * advantages
+    surr2 = torch.clamp(ratio, 1.0 - clip_epsilon, 1.0 + clip_epsilon) * advantages
+
+    # Policy loss (on minimise, donc on prend -min)
+    policy_loss = -torch.min(surr1, surr2).mean()
+
+    # Entropy bonus (on veut maximiser l'entropie, donc -entropy pour minimiser)
+    entropy_loss = -entropy.mean()
+
+    # Loss totale (PAS de value loss)
+    loss = policy_loss + entropy_coef * entropy_loss
+
+    # Statistiques pour logging
+    stats = {
+        "loss/total": loss.item(),
+        "loss/policy": policy_loss.item(),
+        "loss/entropy": entropy_loss.item(),
+        "kl_div": kl_div.item(),
+        "ratio_mean": ratio.mean().item(),
+        "ratio_std": ratio.std().item(),
+        "advantages_mean": advantages.mean().item(),
+        "advantages_std": advantages.std().item(),
+    }
+
+    return loss, stats
+
+
+class PPOTrainerNoValueHead:
+    """
+    PPO Trainer SANS value head.
+    Utilise directement le reward model pour calculer les avantages.
+    Plus simple et économise des paramètres.
     """
 
     def __init__(
@@ -45,18 +105,14 @@ class PPOTrainer:
         if use_gradient_checkpointing and hasattr(self.policy_model, 'gradient_checkpointing_enable'):
             self.policy_model.gradient_checkpointing_enable()
             print("✓ Gradient checkpointing activé (économie ~30-40% d'activations)")
-        
-        # Ajouter un value head au policy model pour PPO
-        self.policy_model = add_value_head_to_model(self.policy_model)
-        # S'assurer que le modèle est sur le bon device
-        self.policy_model = self.policy_model.to(self.device)
+
+        # PAS de value head - c'est la différence principale !
+        print("✓ Mode PPO sans Value Head - rewards directs du reward model")
 
         # Paramètres PPO
         self.clip_epsilon = float(config["ppo"]["clip_epsilon"])
-        self.value_coef = float(config["ppo"]["value_coef"])
         self.entropy_coef = float(config["ppo"]["entropy_coef"])
         self.gamma = float(config["ppo"]["gamma"])
-        self.gae_lambda = float(config["ppo"]["gae_lambda"])
         self.num_ppo_epochs = int(config["ppo"]["num_ppo_epochs"])
         
         # Target KL for early stopping
@@ -69,7 +125,7 @@ class PPOTrainer:
         )
         self.reward_model = RewardModel(reward_model_name, device=str(self.device))
 
-        # Optimiseur (inclut le value head)
+        # Optimiseur (SANS value head, moins de paramètres)
         use_8bit_optimizer = config.get("training", {}).get(
             "use_8bit_optimizer", True
         )
@@ -107,7 +163,7 @@ class PPOTrainer:
 
         for epoch in range(num_epochs):
             pbar = tqdm(self.prompt_loader,
-                        desc=f"PPO Epoch {epoch+1}/{num_epochs}")
+                        desc=f"PPO (No VH) Epoch {epoch+1}/{num_epochs}")
             running_stats = {}
 
             for step, batch in enumerate(pbar):
@@ -130,43 +186,30 @@ class PPOTrainer:
 
             # Sauvegarder checkpoint
             ckpt_path = os.path.join(self.save_dir,
-                                     f"policy_ppo_epoch_{epoch+1}.pt")
+                                     f"policy_ppo_no_vh_epoch_{epoch+1}.pt")
             save_checkpoint(self.policy_model, self.optimizer, ckpt_path)
 
     def _ppo_step(self, batch: Dict[str, torch.Tensor]) -> Dict[str, float]:
         """
-        Un step PPO complet:
+        Un step PPO complet SANS value head:
         1. Génération de réponses
-        2. Calcul des rewards
-        3. Multiple epochs de PPO sur les données collectées
+        2. Calcul des rewards directs
+        3. Advantages = rewards (pas de baseline)
+        4. Multiple epochs de PPO sur les données collectées
         """
         batch = {k: v.to(self.device) for k, v in batch.items()}
         
         # 1. Générer des réponses avec la politique actuelle
         generated_data = self._generate_responses(batch)
 
-        # 2. Calculer les rewards
+        # 2. Calculer les rewards DIRECTEMENT
         rewards = self.reward_model.compute_rewards(generated_data["texts"])
-        # Convertir rewards au dtype du policy model
         model_dtype = next(self.policy_model.parameters()).dtype
         rewards = rewards.to(dtype=model_dtype)
 
-        # 3. Calculer les values et advantages
-        with torch.no_grad():
-            # Re-forward pour obtenir les values de l'ancienne politique
-            old_outputs = self.policy_model(
-                input_ids=generated_data["input_ids"],
-                attention_mask=generated_data["attention_mask"],
-                output_hidden_states=True,
-            )
-            # Value à partir du dernier token de prompt
-            last_hidden = old_outputs.hidden_states[-1][:, -1, :]  # [B, H]
-            old_values = self.policy_model.value_head(last_hidden)  # [B]
-
-            # Compute advantages (simplifié: on utilise juste le reward)
-            # Dans une vraie implémentation, on ferait GAE sur une trajectoire
-            advantages = rewards - old_values
-            returns = rewards
+        # 3. Advantages = rewards directement (pas de value baseline)
+        # On peut normaliser pour stabiliser l'entraînement
+        advantages = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
 
         # 4. Stocker les log-probs de l'ancienne politique
         old_logps = generated_data["logps"].detach()
@@ -180,7 +223,6 @@ class PPOTrainer:
             outputs = self.policy_model(
                 input_ids=generated_data["input_ids"],
                 attention_mask=generated_data["attention_mask"],
-                output_hidden_states=True,
             )
 
             # Calculer les nouveaux log-probs
@@ -202,10 +244,6 @@ class PPOTrainer:
                     generated_data["response_mask"],
                 )
 
-            # Values
-            last_hidden = outputs.hidden_states[-1][:, -1, :]
-            values = self.policy_model.value_head(last_hidden)
-
             # Entropy (approximation simple)
             entropy = torch.ones_like(policy_logps) * 0.1  # TODO: calculer vraie entropy
 
@@ -217,16 +255,13 @@ class PPOTrainer:
                 total_stats["approx_kl_at_stop"] = [approx_kl]
                 break
 
-            # PPO loss
-            loss, stats = ppo_loss(
+            # PPO loss SANS value head
+            loss, stats = ppo_loss_no_value(
                 policy_logps,
                 ref_logps,
                 old_logps,
                 advantages,
-                values,
-                returns,
                 self.clip_epsilon,
-                self.value_coef,
                 self.entropy_coef,
                 entropy,
             )
@@ -240,6 +275,8 @@ class PPOTrainer:
 
             # Accumulate stats
             stats["approx_kl"] = approx_kl
+            stats["reward_mean"] = rewards.mean().item()
+            stats["reward_std"] = rewards.std().item()
             for k, v in stats.items():
                 if k not in total_stats:
                     total_stats[k] = []
@@ -256,7 +293,7 @@ class PPOTrainer:
         """
         self.policy_model.eval()
 
-        prompt_ids = batch["input_ids"]  # [B, L_prompt]
+        prompt_ids = batch["input_ids"]
         prompt_mask = batch["attention_mask"]
 
         # Génération
@@ -274,10 +311,9 @@ class PPOTrainer:
         
         # Créer les tenseurs complets (prompt + response)
         full_ids = generated_ids
-        # Créer attention mask avec le bon dtype (float pour le modèle)
         full_mask = torch.ones_like(full_ids, dtype=torch.long)
 
-        # Masque de réponse (utilisé pour les calculs, doit être en float)
+        # Masque de réponse
         model_dtype = next(self.policy_model.parameters()).dtype
         response_mask = torch.zeros_like(full_ids, dtype=model_dtype)
         response_mask[:, prompt_ids.shape[1]:] = 1

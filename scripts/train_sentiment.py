@@ -8,10 +8,10 @@ from torch.utils.data import DataLoader
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT)
 
-from src.dpo.models import load_models
-from src.dpo.data import PreferenceDataset, preference_collate_fn
+from src.core.models import load_models
+from src.core.data import PreferenceDataset, preference_collate_fn
 from src.dpo.trainer import DPOTrainer
-from src.dpo.utils import load_yaml_config
+from src.core.utils import load_yaml_config
 
 
 def main():

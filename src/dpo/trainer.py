@@ -7,8 +7,8 @@ from torch.optim import AdamW
 from tqdm.auto import tqdm
 
 from .losses import dpo_loss
-from .models import compute_logprobs, ModelBundle
-from .utils import set_seed, save_checkpoint
+from ..core.models import compute_logprobs, ModelBundle
+from ..core.utils import set_seed, save_checkpoint
 
 
 class DPOTrainer:

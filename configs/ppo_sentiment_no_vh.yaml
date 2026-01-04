@@ -1,4 +1,4 @@
-experiment_name: "ppo_sentiment_tinyllama"
+experiment_name: "ppo_sentiment_no_value_head"
 
 model:
   name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
@@ -18,12 +18,10 @@ training:
 
 ppo:
   clip_epsilon: 0.2        # PPO clipping epsilon
-  value_coef: 0.5          # Coefficient pour value loss
-  entropy_coef: 0.01       # Coefficient pour entropy bonus
-  gamma: 0.99              # Discount factor
-  gae_lambda: 0.95         # GAE lambda
+  entropy_coef: 0.01       # Coefficient pour entropy bonus (PAS de value_coef)
+  gamma: 0.99              # Discount factor (moins utilisé sans GAE)
   num_ppo_epochs: 4        # Nombre d'epochs PPO par batch
-  target_kl: 0.01          # Target KL for early stopping (0.01 = 1% divergence)
+  target_kl: 0.01          # Target KL for early stopping
   use_kl_early_stop: true  # Activer l'arrêt précoce basé sur KL
 
 reward_model:
@@ -39,6 +37,6 @@ data:
   max_prompt_length: 256
 
 logging:
-  save_dir: "checkpoints/sentiment_ppo"
+  save_dir: "checkpoints/sentiment_ppo_no_vh"
   log_every: 10
   eval_every: 100
