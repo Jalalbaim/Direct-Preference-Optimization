@@ -223,12 +223,15 @@ def main():
 
     if args.dpo_checkpoint and os.path.exists(args.dpo_checkpoint):
         ckpt = torch.load(args.dpo_checkpoint, map_location="cpu")
+        loaded=0
         for name, tensor in ckpt["model_state_dict"].items():
             try:
                 set_module_tensor_to_device(policy_model, name, device=0, value=tensor)
+                loaded+=1
             except Exception:
                 pass
         print("Loaded DPO checkpoint")
+        print(f"✅ Loaded {loaded} parameters from DPO checkpoint")
 
     ref_model.to(device).eval()
     policy_model.to(device).eval()
