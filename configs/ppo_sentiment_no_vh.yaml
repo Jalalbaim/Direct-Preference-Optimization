@@ -8,7 +8,7 @@ model:
 training:
   seed: 42
   num_epochs: 1
-  batch_size: 6
+  batch_size: 4
   learning_rate: 1e-5
   weight_decay: 0.01
   max_grad_norm: 1.0
@@ -38,8 +38,8 @@ data:
 
 logging:
   save_dir: "checkpoints/sentiment_ppo_no_vh"
-  log_every: 10
-  eval_every: 100
+  log_every: 3
+  eval_every: 25
   wandb_enabled: true
   wandb_project: "ppo-sentiment"
   wandb_run_name: "ppo_no_vh"
