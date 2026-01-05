@@ -134,9 +134,9 @@ def generate_win_rate(
             device,
         )
 
-        print("\n==== CHECKPOINT JUDGE OUTPUT ====")
-        print(content)
-        print("==== END ====")
+        #print("\n==== CHECKPOINT JUDGE OUTPUT ====")
+        #print(content)
+        #print("==== END ====")
 
         match = re.search(
             r"^Preferred:\s*([AB])$",
