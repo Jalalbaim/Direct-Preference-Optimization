@@ -19,12 +19,15 @@ dpo:
   beta: 0.1  # hyperparam DPO
   label_smoothing: 0.0
   prompt: |
-    You are a strict evaluator.
+    You are an evaluator.
 
-    You MUST output two lines.
+    Given the post and two summaries, choose which summary is better.
 
-    Comparison: <one sentence>
-    Preferred: A or B
+    Reply with exactly ONE character:
+    A or B
+
+    Do not explain.
+    Do not output anything else.
 
     Post:
     {post}
@@ -35,7 +38,6 @@ dpo:
     Summary B:
     {summary_b}
 
-    Now output the two lines.
 
 data:
   train_path: "data/processed/summarization/train_summarization.jsonl"

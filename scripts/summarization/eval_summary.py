@@ -3,7 +3,6 @@ import os
 import sys
 import argparse
 import json
-import re
 
 import torch
 from datasets import load_dataset
@@ -63,39 +62,36 @@ def generate_summary(
 
 
 @torch.no_grad()
-def judge_pairwise_chat(
+def judge_pairwise(
     judge_model,
     judge_tokenizer,
     formatted_prompt,
     device,
-    max_new_tokens=128,
 ):
-    messages = [{"role": "user", "content": formatted_prompt}]
-
-    prompt = judge_tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-
-    inputs = judge_tokenizer(prompt, 
-                             return_tensors="pt",
-                             truncation=True,
-                             max_length=2048).to(device)
+    inputs = judge_tokenizer(
+        formatted_prompt,
+        return_tensors="pt",
+        truncation=True,
+        max_length=2048,
+    ).to(device)
 
     outputs = judge_model.generate(
         **inputs,
-        max_new_tokens=max_new_tokens,
+        max_new_tokens=2,          # IMPORTANT
         do_sample=False,
+        temperature=0.0,
         eos_token_id=judge_tokenizer.eos_token_id,
         pad_token_id=judge_tokenizer.eos_token_id,
     )
 
     generated = outputs[0][inputs["input_ids"].shape[1]:]
-    text = judge_tokenizer.decode(generated, skip_special_tokens=True).strip()
+    text = judge_tokenizer.decode(generated, skip_special_tokens=True).strip().upper()
 
-    lines = [l for l in text.splitlines() if l.strip()]
-    return "\n".join(lines[:2])
+    if text.startswith("A"):
+        return "A"
+    if text.startswith("B"):
+        return "B"
+    return None
 
 
 @torch.no_grad()
@@ -112,8 +108,7 @@ def generate_win_rate(
     win_rate_a = []
     win_rate_b = []
 
-    if save_path:
-        f_out = open(save_path, "w", encoding="utf-8")
+    f_out = open(save_path, "w", encoding="utf-8") if save_path else None
 
     for sa, sb, txt in tqdm(
         zip(summaries_a, summaries_b, original_texts),
@@ -126,42 +121,30 @@ def generate_win_rate(
             .replace("{summary_b}", sb)
         )
 
-        content = judge_pairwise_chat(
+        choice = judge_pairwise(
             judge_model,
             judge_tokenizer,
             formatted_prompt,
             device,
         )
 
-        #print("\n==== CHECKPOINT JUDGE OUTPUT ====")
-        #print(content)
-        #print("==== END ====")
-
-        match = re.search(
-            r"^Preferred:\s*([AB])$",
-            content.splitlines()[-1],
-            re.IGNORECASE,
-        )
-        choice = match.group(1).upper() if match else "None"
+        if choice is None:
+            continue
 
         if choice == "A":
             win_rate_a.append(1)
             win_rate_b.append(0)
-        elif choice == "B":
+        else:
             win_rate_a.append(0)
             win_rate_b.append(1)
-        else:
-            continue
 
-        if save_path:
+        if f_out:
             json.dump(
                 {
                     "type": "example",
                     "original_prompt": txt,
                     "summary_dpo": sa,
                     "summary_ref": sb,
-                    "formatted_prompt": formatted_prompt,
-                    "judge_output": content,
                     "choice": choice,
                 },
                 f_out,
@@ -169,7 +152,7 @@ def generate_win_rate(
             )
             f_out.write("\n")
 
-    if save_path:
+    if f_out:
         f_out.close()
 
     return win_rate_a, win_rate_b
@@ -201,9 +184,8 @@ def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, de
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/summary.yaml")
-    parser.add_argument("--max_prompt_chars", type=int, default=1000)
     parser.add_argument("--max_new_tokens", type=int, default=32)
-    parser.add_argument("--temperature", type=float, default=1)
+    parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--ref_model_name", type=str, default=None)
     parser.add_argument("--dpo_checkpoint", type=str, default="checkpoints/summary_dpo/policy_epoch_1.pt")
@@ -223,14 +205,12 @@ def main():
 
     if args.dpo_checkpoint and os.path.exists(args.dpo_checkpoint):
         ckpt = torch.load(args.dpo_checkpoint, map_location="cpu")
-        loaded = 0
         for name, tensor in ckpt["model_state_dict"].items():
             try:
                 set_module_tensor_to_device(policy_model, name, device=0, value=tensor)
-                loaded += 1
             except Exception:
                 pass
-        print(f"✅ Loaded {loaded} parameters from DPO checkpoint")
+        print("✅ Loaded DPO checkpoint")
 
     ref_model.to(device).eval()
     policy_model.to(device).eval()
@@ -243,8 +223,7 @@ def main():
         .select(range(config["testing"]["prompt_nb"]))
     )
 
-
-    # Judge model
+    # Judge model (P100-safe)
     judge_name = "Qwen2.5-3B-Instruct"
     judge_tokenizer = AutoTokenizer.from_pretrained(judge_name)
     judge_model = AutoModelForCausalLM.from_pretrained(
@@ -297,7 +276,6 @@ def main():
     print(f"Win rate (DPO > Ref): {win_rate:.3f}")
     print(f"Avg KL(policy || ref): {avg_kl:.4f}")
 
-    # Append final metrics
     with open(args.save_judge_outputs, "a", encoding="utf-8") as f:
         json.dump(
             {
@@ -314,8 +292,6 @@ def main():
             ensure_ascii=False,
         )
         f.write("\n")
-
-    print(f"Judge outputs saved to: {args.save_judge_outputs}")
 
 
 if __name__ == "__main__":
