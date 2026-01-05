@@ -81,7 +81,6 @@ def judge_pairwise_chat(
     inputs = judge_tokenizer(prompt, 
                              return_tensors="pt",
                              truncation=True,
-                             truncation_side="left",
                              max_length=2048).to(device)
 
     outputs = judge_model.generate(
