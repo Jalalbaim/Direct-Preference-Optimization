@@ -58,7 +58,7 @@ def generate_response(model, tokenizer, prompt, max_new_tokens=64, temperature=0
             input_ids=input_ids,
             attention_mask=attn_mask,
             max_new_tokens=max_new_tokens,
-            do_sample=False,
+            do_sample=False,    
             pad_token_id=tokenizer.pad_token_id,
             eos_token_id=tokenizer.eos_token_id,
         )
