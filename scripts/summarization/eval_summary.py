@@ -224,7 +224,7 @@ def main():
     )
 
     # Judge model (P100-safe)
-    judge_name = "Qwen2.5-3B-Instruct"
+    judge_name = "Qwen/Qwen2.5-3B-Instruct"
     judge_tokenizer = AutoTokenizer.from_pretrained(judge_name)
     judge_model = AutoModelForCausalLM.from_pretrained(
         judge_name,
