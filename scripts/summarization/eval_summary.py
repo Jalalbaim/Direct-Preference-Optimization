@@ -151,8 +151,7 @@ def generate_win_rate(
             win_rate_a.append(0)
             win_rate_b.append(1)
         else:
-            win_rate_a.append(0)
-            win_rate_b.append(0)
+            continue
 
         if save_path:
             json.dump(
@@ -203,7 +202,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/summary.yaml")
     parser.add_argument("--max_prompt_chars", type=int, default=1000)
-    parser.add_argument("--max_new_tokens", type=int, default=256)
+    parser.add_argument("--max_new_tokens", type=int, default=32)
     parser.add_argument("--temperature", type=float, default=1)
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--ref_model_name", type=str, default=None)
@@ -246,7 +245,7 @@ def main():
 
 
     # Judge model
-    judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    judge_name = "Qwen2.5-3B-Instruct"
     judge_tokenizer = AutoTokenizer.from_pretrained(judge_name)
     judge_model = AutoModelForCausalLM.from_pretrained(
         judge_name,
