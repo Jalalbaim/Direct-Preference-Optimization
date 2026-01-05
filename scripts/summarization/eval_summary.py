@@ -25,7 +25,7 @@ def generate_summary(
     model,
     tokenizer,
     prompts,
-    max_new_tokens=64,
+    max_new_tokens=128,
     temperature=0.8,
     top_p=0.9,
     device="cuda",
@@ -37,7 +37,7 @@ def generate_summary(
         prompts,
         return_tensors="pt",
         truncation=True,
-        max_length=512,
+        max_length=2048,
         padding=True,
     ).to(device)
 
@@ -78,7 +78,11 @@ def judge_pairwise_chat(
         add_generation_prompt=True,
     )
 
-    inputs = judge_tokenizer(prompt, return_tensors="pt").to(device)
+    inputs = judge_tokenizer(prompt, 
+                             return_tensors="pt",
+                             truncation=True,
+                             truncation_side="left",
+                             max_length=2048).to(device)
 
     outputs = judge_model.generate(
         **inputs,
@@ -200,7 +204,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/summary.yaml")
     parser.add_argument("--max_prompt_chars", type=int, default=1000)
-    parser.add_argument("--max_new_tokens", type=int, default=128)
+    parser.add_argument("--max_new_tokens", type=int, default=256)
     parser.add_argument("--temperature", type=float, default=1)
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--ref_model_name", type=str, default=None)
@@ -255,7 +259,7 @@ def main():
     summaries_a, summaries_b, originals, kls = [], [], [], []
 
     for ex in tqdm(test_ds):
-        prompt = ex["prompt"][: args.max_prompt_chars].strip()
+        prompt = ex["prompt"].strip()
         if not prompt:
             continue
 
