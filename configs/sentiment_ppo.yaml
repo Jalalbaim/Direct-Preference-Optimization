@@ -1,0 +1,35 @@
+# configs/sentiment_ppo.yaml
+data:
+  train_prompts_path: data/processed/sentiment/prompts_train.jsonl
+  val_prompts_path: data/processed/sentiment/prompts_val.jsonl
+  max_prompt_length: 256
+  max_new_tokens: 64
+
+model:
+  name: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+  dtype: bfloat16
+
+reward:
+  clf_model_name: lvwerra/distilbert-imdb
+
+ppo:
+  kl_coef: 0.1
+  clip_range: 0.2
+  vf_coef: 0.5
+  ppo_epochs: 1
+  temperature: 0.8
+  top_p: 0.9
+
+training:
+  batch_size: 1
+  grad_accumulation_steps: 8
+  learning_rate: 1.0e-6
+  value_learning_rate: 5.0e-6
+  max_grad_norm: 1.0
+  num_epochs: 1
+  seed: 42
+  max_steps: null # mets un int si tu veux couper plus tôt
+
+logging:
+  log_every: 50
+  save_dir: checkpoints/sentiment_ppo_kl_0.1

@@ -5,3 +5,5 @@ test_setup.py
 src/dpo/__pycache__/
 
 checkpoints/
+
+all_parsed_files.txt
