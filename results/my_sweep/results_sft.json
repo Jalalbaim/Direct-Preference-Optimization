@@ -1,0 +1,8 @@
+{
+    "name": "SFT",
+    "beta": 0.0,
+    "avg_reward": 0.4432,
+    "avg_kl": 0.0,
+    "std_reward": 0.02,
+    "std_kl": 0.0
+}
