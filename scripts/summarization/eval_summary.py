@@ -172,7 +172,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/summary.yaml")
     parser.add_argument("--max_new_tokens", type=int, default=32)
-    parser.add_argument("--temperature", type=float, default=0.25)
+    parser.add_argument("--temperature", type=float, default=1e-6)
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--dpo_checkpoint", default="checkpoints/summary_dpo/policy_epoch_1.pt")
     parser.add_argument("--save_judge_outputs", default="judge_outputs.jsonl")
@@ -256,6 +256,24 @@ def main():
     print(f"Judge decision rate: {decision_rate:.3f}")
     print(f"Abstentions:         {abstain}/{total}")
     print(f"Avg KL:              {sum(kls)/len(kls):.4f}")
+
+    with open(args.save_judge_outputs, "a", encoding="utf-8") as f:
+        json.dump(
+            {
+                "type": "summary",
+                "real_win_rate": real_win_rate,
+                "conditional_win_rate": conditional_win_rate,
+                "avg_kl_policy_ref": sum(kls)/len(kls),
+                "temperature": args.temperature,
+                "top_p": args.top_p,
+                "max_new_tokens": args.max_new_tokens,
+                "dpo_checkpoint": args.dpo_checkpoint,
+                "judge_model": judge_name,
+            },
+            f,
+            ensure_ascii=False,
+        )
+        f.write("\n")
 
 
 if __name__ == "__main__":
