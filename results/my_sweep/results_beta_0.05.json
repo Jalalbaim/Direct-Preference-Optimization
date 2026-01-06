@@ -1,0 +1,10 @@
+{
+    "name": "DPO (beta=0.05)",
+    "beta": 0.05,
+    "avg_reward": 0.6932,
+    "avg_reward_ref": 0.4181,
+    "avg_kl": 4.1748,
+    "win_rate": 0.68,
+    "std_reward": 0.05,
+    "std_kl": 2.0
+}
