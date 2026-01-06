@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 import json
+import re
 
 import torch
 from datasets import load_dataset
@@ -24,11 +25,14 @@ def generate_summary(
     model,
     tokenizer,
     prompts,
-    max_new_tokens=32,
+    max_new_tokens=256,
     temperature=0.8,
     top_p=0.9,
     device="cuda",
 ):
+    responses = []
+    full_ids_list = []
+
     enc = tokenizer(
         prompts,
         return_tensors="pt",
@@ -47,108 +51,108 @@ def generate_summary(
         eos_token_id=tokenizer.eos_token_id,
     )
 
-    responses = []
-    full_ids = []
-
     for i in range(len(prompts)):
         prompt_len = int(enc["attention_mask"][i].sum())
-        gen_ids = out[i][prompt_len:]
-        text = tokenizer.decode(gen_ids, skip_special_tokens=True).strip()
-        responses.append(text)
-        full_ids.append(out[i])
+        full_ids = out[i]
+        response_ids = full_ids[prompt_len:]
+        response = tokenizer.decode(response_ids, skip_special_tokens=True)
+        responses.append(response.strip())
+        full_ids_list.append(full_ids)
 
-    return responses, full_ids
+    return responses, full_ids_list
 
 
 @torch.no_grad()
-def judge_pairwise(
+def judge_pairwise_chat(
     judge_model,
     judge_tokenizer,
     formatted_prompt,
     device,
+    max_new_tokens=128,
 ):
+    messages = [{"role": "user", "content": formatted_prompt}]
+
+    prompt = judge_tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+
     inputs = judge_tokenizer(
-        formatted_prompt,
+        prompt,
         return_tensors="pt",
         truncation=True,
+        truncation_side="left",
         max_length=2048,
     ).to(device)
 
     outputs = judge_model.generate(
         **inputs,
-        max_new_tokens=2,
+        max_new_tokens=max_new_tokens,
         do_sample=False,
-        temperature=0.0,
         eos_token_id=judge_tokenizer.eos_token_id,
         pad_token_id=judge_tokenizer.eos_token_id,
     )
 
-    gen = outputs[0][inputs["input_ids"].shape[1]:]
-    text = judge_tokenizer.decode(gen, skip_special_tokens=True).strip().upper()
+    generated = outputs[0][inputs["input_ids"].shape[1]:]
+    text = judge_tokenizer.decode(generated, skip_special_tokens=True).strip()
 
-    if text.startswith("A"):
-        return "A"
-    if text.startswith("B"):
-        return "B"
-    return None
+    lines = [l for l in text.splitlines() if l.strip()]
+    return "\n".join(lines[:2])
 
 
 @torch.no_grad()
-def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, device):
-    input_ids = input_ids.unsqueeze(0).to(device)
-    attention_mask = attention_mask.unsqueeze(0).to(device)
-
-    policy_logits = policy_model(input_ids, attention_mask).logits[:, :-1]
-    ref_logits = ref_model(input_ids, attention_mask).logits[:, :-1]
-    shift_mask = attention_mask[:, 1:]
-
-    p_log = torch.log_softmax(policy_logits, dim=-1)
-    r_log = torch.log_softmax(ref_logits, dim=-1)
-    p_prob = torch.softmax(policy_logits, dim=-1)
-
-    kl = (p_prob * (p_log - r_log)).sum(-1)
-    return (kl * shift_mask).sum().item()
-
-
-@torch.no_grad()
-def evaluate_real_win_rate(
+def generate_win_rate(
     judge_model,
     judge_tokenizer,
     summaries_a,
     summaries_b,
-    originals,
+    original_texts,
     prompt_template,
     device,
     save_path=None,
 ):
-    wins = losses = abstain = 0
-    total = len(summaries_a)
+    win_rate_a = []
 
-    f_out = open(save_path, "w", encoding="utf-8") if save_path else None
+    if save_path:
+        f_out = open(save_path, "w", encoding="utf-8")
 
-    for sa, sb, txt in tqdm(zip(summaries_a, summaries_b, originals), total=total):
-        prompt = (
+    for sa, sb, txt in tqdm(
+        zip(summaries_a, summaries_b, original_texts),
+        total=len(summaries_a),
+    ):
+        formatted_prompt = (
             prompt_template
             .replace("{post}", txt)
             .replace("{summary_a}", sa)
             .replace("{summary_b}", sb)
         )
 
-        choice = judge_pairwise(judge_model, judge_tokenizer, prompt, device)
+        content = judge_pairwise_chat(
+            judge_model,
+            judge_tokenizer,
+            formatted_prompt,
+            device,
+        )
 
-        if choice == "A":
-            wins += 1
-        elif choice == "B":
-            losses += 1
-        else:
-            abstain += 1
+        match = re.search(
+            r"^Preferred:\s*([AB])$",
+            content.splitlines()[-1],
+            re.IGNORECASE,
+        )
+        choice = match.group(1).upper() if match else "None"
 
-        if f_out:
+        win_rate_a.append(1 if choice == "A" else 0)
+
+        if save_path:
             json.dump(
                 {
-                    "prompt": txt,
+                    "type": "example",
+                    "original_prompt": txt,
                     "summary_dpo": sa,
                     "summary_ref": sb,
+                    "formatted_prompt": formatted_prompt,
+                    "judge_output": content,
                     "choice": choice,
                 },
                 f_out,
@@ -156,26 +160,53 @@ def evaluate_real_win_rate(
             )
             f_out.write("\n")
 
-    if f_out:
+    if save_path:
         f_out.close()
 
-    return wins, losses, abstain, total
+    return win_rate_a
+
+
+@torch.no_grad()
+def compute_kl_divergence(policy_model, ref_model, input_ids, attention_mask, device):
+    input_ids = input_ids.unsqueeze(0).to(device)
+    attention_mask = attention_mask.unsqueeze(0).to(device)
+
+    policy_outputs = policy_model(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+    )
+    ref_outputs = ref_model(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+    )
+
+    policy_logits = policy_outputs.logits[:, :-1, :]
+    ref_logits = ref_outputs.logits[:, :-1, :]
+    shift_attn = attention_mask[:, 1:]
+
+    policy_probs = torch.softmax(policy_logits, dim=-1)
+    policy_log_probs = torch.log_softmax(policy_logits, dim=-1)
+    ref_log_probs = torch.log_softmax(ref_logits, dim=-1)
+
+    kl_per_token = (policy_probs * (policy_log_probs - ref_log_probs)).sum(dim=-1)
+    kl = (kl_per_token * shift_attn).sum().item()
+
+    return kl
 
 
 # MAIN -----------------
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="configs/summary.yaml")
-    parser.add_argument("--max_new_tokens", type=int, default=32)
-    parser.add_argument("--temperature", type=float, default=0.25)
+    parser.add_argument("--config", type=str, default="configs/summary.yaml")
+    parser.add_argument("--max_new_tokens", type=int, default=256)
+    parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--top_p", type=float, default=0.9)
-    parser.add_argument("--dpo_checkpoint", default="checkpoints/summary_dpo/policy_epoch_1.pt")
-    parser.add_argument("--save_judge_outputs", default="judge_outputs.jsonl")
+    parser.add_argument("--dpo_checkpoint", type=str, default="checkpoints/summary_dpo/policy_epoch_1.pt")
+    parser.add_argument("--save_judge_outputs", type=str, default="judge_outputs.jsonl")
     args = parser.parse_args()
 
     config = load_yaml_config(args.config)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
 
     # Load models
     mb = load_models(config["model"]["name"], dtype=config["model"]["dtype"])
@@ -183,21 +214,23 @@ def main():
     ref_model = mb.ref_model.to(device).eval()
     policy_model = mb.policy_model.to(device).eval()
 
-    if os.path.exists(args.dpo_checkpoint):
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    if args.dpo_checkpoint and os.path.exists(args.dpo_checkpoint):
         ckpt = torch.load(args.dpo_checkpoint, map_location="cpu")
-        for n, t in ckpt["model_state_dict"].items():
+        for name, tensor in ckpt["model_state_dict"].items():
             try:
-                set_module_tensor_to_device(policy_model, n, device=0, value=t)
+                set_module_tensor_to_device(policy_model, name, device=0, value=tensor)
             except Exception:
                 pass
-        print("✅ Loaded DPO checkpoint")
 
     # Dataset
-    ds = load_dataset("CarperAI/openai_summarize_tldr")["test"]
-    ds = ds.shuffle(seed=789).select(range(config["testing"]["prompt_nb"]))
+    dataset = load_dataset("CarperAI/openai_summarize_tldr")
+    test_ds = dataset["test"].shuffle(seed=789).select(range(config["testing"]["prompt_nb"]))
 
     # Judge
-    judge_name = "Qwen/Qwen2.5-3B-Instruct"
+    judge_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     judge_tokenizer = AutoTokenizer.from_pretrained(judge_name)
     judge_model = AutoModelForCausalLM.from_pretrained(
         judge_name,
@@ -208,29 +241,28 @@ def main():
 
     summaries_a, summaries_b, originals, kls = [], [], [], []
 
-    for ex in tqdm(ds):
+    for ex in tqdm(test_ds):
         prompt = ex["prompt"].strip()
         if not prompt:
             continue
 
-        ref, _ = generate_summary(
+        ref_resp, _ = generate_summary(
             ref_model, tokenizer, [prompt],
             args.max_new_tokens, args.temperature, args.top_p, device
         )
-
-        dpo, dpo_ids = generate_summary(
+        dpo_resp, dpo_ids = generate_summary(
             policy_model, tokenizer, [prompt],
             args.max_new_tokens, args.temperature, args.top_p, device
         )
 
-        summaries_a.append(dpo[0])
-        summaries_b.append(ref[0])
+        summaries_a.append(dpo_resp[0])
+        summaries_b.append(ref_resp[0])
         originals.append(prompt)
 
         attn = (dpo_ids[0] != tokenizer.pad_token_id).long()
         kls.append(compute_kl_divergence(policy_model, ref_model, dpo_ids[0], attn, device))
 
-    wins, losses, abstain, total = evaluate_real_win_rate(
+    win_a = generate_win_rate(
         judge_model,
         judge_tokenizer,
         summaries_a,
@@ -241,16 +273,9 @@ def main():
         args.save_judge_outputs,
     )
 
-    real_win_rate = wins / total
-    conditional_win_rate = wins / (wins + losses) if (wins + losses) else 0.0
-    decision_rate = (wins + losses) / total
-
     print("\n==== DPO SUMMARY EVAL ====")
-    print(f"Real win rate:        {real_win_rate:.3f}")
-    print(f"Conditional win rate:{conditional_win_rate:.3f}")
-    print(f"Judge decision rate: {decision_rate:.3f}")
-    print(f"Abstentions:         {abstain}/{total}")
-    print(f"Avg KL:              {sum(kls)/len(kls):.4f}")
+    print(f"Win rate (DPO > Ref): {sum(win_a)/len(win_a):.3f}")
+    print(f"Avg KL(policy || ref): {sum(kls)/len(kls):.4f}")
 
 
 if __name__ == "__main__":
