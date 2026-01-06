@@ -1,0 +1,25 @@
+# PyTorch - Installer AVANT les autres avec la commande appropriée pour votre système
+# Voir SETUP_ENVIRONMENT.md pour les instructions
+
+# Core ML libraries
+transformers==4.36.2
+datasets==2.16.1
+trl==0.7.10
+peft==0.7.1
+accelerate==0.25.0
+
+# Utilities
+numpy<2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+tqdm>=4.65.0
+
+# Logging
+wandb>=0.16.0
+
+# Optional: pour quantization (ne fonctionne pas sur Mac)
+# Décommenter si vous avez un GPU NVIDIA:
+
+# Pour éviter les warnings
+protobuf>=3.20.0
+sentencepiece>=0.1.99
