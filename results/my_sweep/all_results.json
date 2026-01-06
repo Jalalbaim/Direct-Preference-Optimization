@@ -1,0 +1,40 @@
+[
+    {
+        "name": "SFT",
+        "beta": 0.0,
+        "avg_reward": 0.4424,
+        "avg_kl": 0.0,
+        "std_reward": 0.02,
+        "std_kl": 0.0
+    },
+    {
+        "name": "DPO (beta=0.05)",
+        "beta": 0.05,
+        "avg_reward": 0.6932,
+        "avg_reward_ref": 0.4181,
+        "avg_kl": 4.1748,
+        "win_rate": 0.68,
+        "std_reward": 0.05,
+        "std_kl": 2.0
+    },
+    {
+        "name": "DPO (beta=0.1)",
+        "beta": 0.1,
+        "avg_reward": 0.689,
+        "avg_reward_ref": 0.4828,
+        "avg_kl": 3.4256,
+        "win_rate": 0.72,
+        "std_reward": 0.05,
+        "std_kl": 2.0
+    },
+    {
+        "name": "DPO (beta=1.0)",
+        "beta": 1.0,
+        "avg_reward": 0.4661,
+        "avg_reward_ref": 0.4926,
+        "avg_kl": 1.1055,
+        "win_rate": 0.48,
+        "std_reward": 0.05,
+        "std_kl": 2.0
+    }
+]
