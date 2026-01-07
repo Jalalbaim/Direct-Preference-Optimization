@@ -199,7 +199,7 @@ def main():
 
     # Dataset
     ds = load_dataset("CarperAI/openai_summarize_tldr")["test"]
-    ds = ds.shuffle(seed=789).select(range(config["testing"]["prompt_nb"]))
+    ds = ds.shuffle(seed=456).select(range(config["testing"]["prompt_nb"]))
 
     # Judge
     judge_name = "Qwen/Qwen2.5-3B-Instruct"
