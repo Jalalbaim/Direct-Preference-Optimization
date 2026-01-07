@@ -42,14 +42,14 @@ dpo:
 data:
   train_path: "data/processed/summarization/train_summarization.jsonl"
   val_path: "data/processed/summarization/val_summarization.jsonl"
-  prompt_nb: 500
+  prompt_nb: 2000
   max_prompt_length: 2048
   max_response_length: 256
 
 logging:
   save_dir: "checkpoints/summary_dpo"
-  log_every: 100
-  eval_every: 100
+  log_every: 500
+  eval_every: 500
 
 testing:
   prompt_nb: 100
