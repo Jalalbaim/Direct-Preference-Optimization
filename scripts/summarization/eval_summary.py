@@ -171,7 +171,7 @@ def evaluate_real_win_rate(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/summary.yaml")
-    parser.add_argument("--max_new_tokens", type=int, default=32)
+    parser.add_argument("--max_new_tokens", type=int, default=64)
     parser.add_argument("--temperature", type=float, default=0.25)
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--dpo_checkpoint", default="checkpoints/summary_dpo/policy_epoch_1.pt")
