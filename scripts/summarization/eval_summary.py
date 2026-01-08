@@ -211,7 +211,7 @@ def main():
         low_cpu_mem_usage=True,
     ).eval()
 
-    summaries_a, summaries_b, originals, kls = [], [], [], []
+    summaries_a, summaries_b, summaries_sft, originals, kls = [], [], [], [], []
 
     for ex in tqdm(ds):
         prompt = ex["prompt"].strip()
@@ -229,7 +229,8 @@ def main():
         )
 
         summaries_a.append(dpo[0])
-        summaries_b.append(ref[0])
+        summaries_b.append(ex["label"].strip())
+        summaries_sft.append(ref[0])
         originals.append(prompt)
 
         attn = (dpo_ids[0] != tokenizer.pad_token_id).long()
@@ -246,12 +247,26 @@ def main():
         args.save_judge_outputs,
     )
 
+    wins_sft, losses_sft, abstain_sft, total_sft = evaluate_real_win_rate(
+        judge_model,
+        judge_tokenizer,
+        summaries_a,
+        summaries_sft,
+        originals,
+        config["dpo"]["prompt"],
+        device,
+        args.save_judge_outputs,
+    )
+
     real_win_rate = wins / total
     conditional_win_rate = wins / (wins + losses) if (wins + losses) else 0.0
     decision_rate = (wins + losses) / total
 
+    sft_win_rate = wins_sft / total_sft
+
     print("\n==== DPO SUMMARY EVAL ====")
     print(f"Real win rate:        {real_win_rate:.3f}")
+    print(f"SFT win rate:        {sft_win_rate:.3f}")
     print(f"Conditional win rate:{conditional_win_rate:.3f}")
     print(f"Judge decision rate: {decision_rate:.3f}")
     print(f"Abstentions:         {abstain}/{total}")
