@@ -16,7 +16,7 @@ training:
   warmup_steps: 10
 
 dpo:
-  beta: 0.5  # hyperparam DPO
+  beta: 0.1 # hyperparam DPO
   label_smoothing: 0.0
   prompt: |
     You are an evaluator.
